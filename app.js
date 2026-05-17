@@ -1556,6 +1556,10 @@ function confirmarEnviar() {
   var clId = pendingEnviarId;
   var label = pendingEnviarLabel;
   if (!clId) return;
+  // Fecha o modal imediatamente para evitar duplo envio
+  pendingEnviarId = null;
+  pendingEnviarLabel = null;
+  document.getElementById('modal-enviar').style.display = 'none';
   var cl = getMyCLs().find(function(c){return c.id===clId;});
   if (!cl) return;
   var snapshot = cl.itens.map(function(item,idx){
@@ -1576,14 +1580,11 @@ function confirmarEnviar() {
     loja:S.currentUser?S.currentUser.loja||'':'',
     dataHora:dh, itens:snapshot, feitos:feitos, total:total, pct:pct
   };
-  var lista = getAllResultados(); // usa lista global para não perder dados de outras lojas
+  var lista = getAllResultados();
   lista.push(res);
   saveResultados(lista);
   addHist('Checklist','"'+label+'" enviado ('+pct+'%)','Geral',pct===100?'st-ok':'st-warn',pct+'%');
   updateDash();
-  pendingEnviarId = null;
-  pendingEnviarLabel = null;
-  document.getElementById('modal-enviar').style.display = 'none';
   showToast(pct===100 ? 'Checklist enviado com sucesso!' : 'Checklist enviado com '+pct+'% concluido');
 }
 
