@@ -375,19 +375,21 @@ function getChecklistsObrigatoriosHoje() {
   });
 }
 
-// Retorna pendências: checklists obrigatórios que ainda não foram enviados hoje
-// e cuja hora limite já passou (ou ainda não passou — ambos são retornados com flag)
+// Retorna pendências: checklists que ainda não foram enviados hoje
 function getPendencias() {
-  var obrigatorios = getChecklistsObrigatoriosHoje();
-  if (!obrigatorios.length) return [];
+  var u = S.currentUser;
+  var isManager = u && (u.perfil === 'admin' || u.perfil === 'gerencia');
+  // Gerência/admin vê TODOS os checklists; operadores só os obrigatórios de hoje
+  var lista = isManager ? getCustomCLs() : getChecklistsObrigatoriosHoje();
+  if (!lista.length) return [];
   var hoje = new Date().toLocaleDateString('pt-BR');
   var agora = new Date();
   var horaAgora = agora.getHours() * 60 + agora.getMinutes();
   var resultados = getResultados();
   var pendencias = [];
-  obrigatorios.forEach(function(cl) {
+  lista.forEach(function(cl) {
     var enviado = resultados.some(function(r){
-      return r.checklistId === cl.id && r.dataHora && r.dataHora.indexOf(hoje) === 0;
+      return r.checklistId === cl.id && r.dataHora && r.dataHora.indexOf(hoje) === 0 && !r.resetado;
     });
     if (!enviado) {
       var partes = (cl.horaLimite || '10:00').split(':');
