@@ -602,6 +602,7 @@ function finalizarLogin(found) {
   document.getElementById('app').style.opacity='0.6';
 
   function iniciarApp() {
+    limparContagensAntigas();
     // Load inv and perdas for this user/day
     loadInvFromFirebase(function(){
       loadPerdasFromFirebase(function(){
@@ -1048,6 +1049,53 @@ function buildCLBlock(cl) {
         belowHtml='<textarea placeholder="Digite a resposta..." onblur="saveTextoItem(\''+cl.id+'\','+i+',this.value)" style="width:100%;margin-top:8px;padding:8px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;color:var(--t)">'+(val&&typeof val==='string'?val:'')+'</textarea>';
       } else if (val) {
         belowHtml='<div style="margin-top:6px;padding:7px 10px;background:var(--gray);border-radius:7px;font-size:12px;color:var(--t2)">'+val+'</div>';
+      }
+    } else if (tipo === 'planilha') {
+      var produtos = item.produtos || [];
+      var filledCount = produtos.filter(function(p) {
+        var v = S.checkState[cl.id+'_qty_'+i+'_'+p.codigo];
+        return v !== undefined && v !== '';
+      }).length;
+      var tHead = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+        +'<thead><tr style="background:var(--gray)">'
+        +'<th style="padding:5px 7px;text-align:left;font-weight:600;color:var(--t2)">Código</th>'
+        +'<th style="padding:5px 7px;text-align:left;font-weight:600;color:var(--t2)">Descrição</th>'
+        +'<th style="padding:5px 7px;text-align:left;font-weight:600;color:var(--t2)">Setor</th>'
+        +'<th style="padding:5px 7px;text-align:center;font-weight:600;color:var(--t2)">Qtd</th>'
+        +'</tr></thead><tbody>';
+      if (!jaConcluido) {
+        belowHtml = '<div style="margin-top:10px;overflow-x:auto">'
+          + tHead
+          + produtos.map(function(p) {
+              var qtdVal = S.checkState[cl.id+'_qty_'+i+'_'+p.codigo];
+              if (qtdVal === undefined) qtdVal = '';
+              var filled = qtdVal !== '';
+              return '<tr style="border-bottom:1px solid var(--gray2)">'
+                +'<td style="padding:5px 7px;color:var(--t2);font-size:11px">'+p.codigo+'</td>'
+                +'<td style="padding:5px 7px;color:var(--t)">'+p.descricao+'</td>'
+                +'<td style="padding:5px 7px;color:var(--t2)">'+( p.setor||'—')+'</td>'
+                +'<td style="padding:5px 7px;text-align:center">'
+                +'<input type="number" min="0" inputmode="numeric" value="'+qtdVal+'"'
+                +' onchange="salvarQuantidade(\''+cl.id+'\','+i+',\''+p.codigo+'\',this.value)"'
+                +' onclick="event.stopPropagation()"'
+                +' style="width:62px;padding:4px 6px;border:1.5px solid '+(filled?'var(--g2)':'var(--gray2)')+';border-radius:6px;font-size:12px;text-align:center;font-weight:'+(filled?'700':'400')+'">'
+                +'</td></tr>';
+            }).join('')
+          + '</tbody></table></div>'
+          + '<div style="font-size:11px;color:var(--t3);margin-top:5px">'+filledCount+'/'+produtos.length+' produtos preenchidos</div>';
+      } else {
+        belowHtml = '<div style="margin-top:10px;overflow-x:auto">'
+          + tHead
+          + produtos.map(function(p) {
+              var qtdVal = S.checkState[cl.id+'_qty_'+i+'_'+p.codigo] || '—';
+              return '<tr style="border-bottom:1px solid var(--gray2)">'
+                +'<td style="padding:5px 7px;color:var(--t2);font-size:11px">'+p.codigo+'</td>'
+                +'<td style="padding:5px 7px;color:var(--t)">'+p.descricao+'</td>'
+                +'<td style="padding:5px 7px;color:var(--t2)">'+(p.setor||'—')+'</td>'
+                +'<td style="padding:5px 7px;text-align:center;font-weight:700;color:var(--g)">'+qtdVal+'</td>'
+                +'</tr>';
+            }).join('')
+          + '</tbody></table></div>';
       }
     }
     return '<div id="cli-' + cl.id + '-' + i + '" style="display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border:1px solid var(--gray2);border-radius:10px;background:' + itemBg + '">'
@@ -1534,6 +1582,74 @@ function resetCL(clId) {
 
 var pendingEnviarId = null;
 var pendingEnviarLabel = null;
+var pendingPlanilhaProdutos = null;
+
+function proximaMeiaNoite() {
+  var d = new Date();
+  d.setHours(24, 0, 0, 0);
+  return d;
+}
+
+function parseCSV(text) {
+  var lines = text.trim().split(/\r?\n/);
+  var sep = text.indexOf(';') > -1 ? ';' : ',';
+  var produtos = [];
+  lines.forEach(function(line, i) {
+    var cols = line.split(sep).map(function(c) { return c.trim().replace(/^"|"$/g, ''); });
+    if (cols.length < 2) return;
+    var codigo = cols[0], descricao = cols[1], setor = cols[2] || '';
+    if (i === 0 && isNaN(parseInt(codigo.replace(/\D/g, '')))) return;
+    if (!codigo || !descricao) return;
+    produtos.push({ codigo: codigo, descricao: descricao, setor: setor });
+  });
+  return produtos;
+}
+
+function togglePlanilhaRow(sel) {
+  var row = document.getElementById('ncl-planilha-row');
+  var fotoSel = document.getElementById('ncl-item-foto');
+  if (!row) return;
+  var isPlanilha = sel.value === 'planilha';
+  row.style.display = isPlanilha ? 'block' : 'none';
+  if (fotoSel) fotoSel.style.display = isPlanilha ? 'none' : '';
+}
+
+function onPlanilhaCSVChange(input) {
+  var file = input.files[0];
+  if (!file) { pendingPlanilhaProdutos = null; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    pendingPlanilhaProdutos = parseCSV(e.target.result);
+    var info = document.getElementById('ncl-planilha-info');
+    if (info) info.textContent = pendingPlanilhaProdutos.length + ' produtos carregados com sucesso';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function salvarQuantidade(clId, itemIdx, codigo, val) {
+  S.checkState[clId + '_qty_' + itemIdx + '_' + codigo] = val;
+  var cl = getMyCLs().find(function(c) { return c.id === clId; });
+  if (!cl) return;
+  var item = cl.itens[itemIdx];
+  if (!item || item.tipo !== 'planilha') return;
+  var allFilled = (item.produtos || []).every(function(p) {
+    var v = S.checkState[clId + '_qty_' + itemIdx + '_' + p.codigo];
+    return v !== undefined && v !== '';
+  });
+  S.checkState[clId + '_' + item.t] = allFilled ? 'done' : '';
+  updateCLProg(cl);
+}
+
+function limparContagensAntigas() {
+  var hoje = new Date().toISOString().slice(0, 10);
+  db.collection('contagens').get().then(function(snap) {
+    snap.docs.forEach(function(doc) {
+      if ((doc.data().data || '') < hoje) {
+        doc.ref.delete().catch(function() {});
+      }
+    });
+  }).catch(function() {});
+}
 
 function jaEnviouHoje(clId) {
   var hoje = new Date().toLocaleDateString('pt-BR');
@@ -1677,6 +1793,23 @@ function confirmarEnviar(assinatura) {
     console.error('Erro ao salvar resultado no Firebase:', err);
     showToast('⚠️ Resultado salvo localmente — sincronizará quando houver conexão');
   });
+  // Salva contagens de planilha com TTL (expiram na meia-noite)
+  var meianoite = proximaMeiaNoite();
+  var hoje = new Date().toISOString().slice(0, 10);
+  cl.itens.forEach(function(clItem, idx) {
+    if (clItem.tipo !== 'planilha' || !clItem.produtos) return;
+    var produtos = clItem.produtos.map(function(p) {
+      return Object.assign({}, p, { quantidade: S.checkState[clId+'_qty_'+idx+'_'+p.codigo] || '' });
+    });
+    var contagemDoc = {
+      id: genId(), checklistId: clId, checklistNome: label,
+      itemTexto: clItem.t, itemIdx: idx,
+      loja: S.currentUser ? S.currentUser.loja || '' : '',
+      operador: S.currentUser ? S.currentUser.nome : '--',
+      data: hoje, expireAt: meianoite, produtos: produtos
+    };
+    db.collection('contagens').doc(contagemDoc.id).set(contagemDoc).catch(function(){});
+  });
   // Auto-criar planos de ação para itens Sim/Não com resposta "Não"
   snapshot.forEach(function(item) {
     if (item.tipo==='simNao' && item.resposta==='nao') {
@@ -1734,15 +1867,29 @@ function addItemNCL() {
   var obs = document.getElementById('ncl-item-obs').value.trim();
   var fotoVal = document.getElementById('ncl-item-foto').value;
   var tipo = (document.getElementById('ncl-item-tipo')||{value:'checkbox'}).value || 'checkbox';
-  var foto = fotoVal !== 'none' ? fotoVal : false;
   var criticoEl = document.getElementById('ncl-item-critico');
-  var critico = criticoEl ? criticoEl.checked : false;
   if (!txt) return;
-  nclItens.push({t:txt, obs:obs, foto:foto, tipo:tipo, critico:critico});
+  if (tipo === 'planilha') {
+    if (!pendingPlanilhaProdutos || !pendingPlanilhaProdutos.length) {
+      showToast('Selecione o arquivo CSV com os produtos primeiro');
+      return;
+    }
+    nclItens.push({ t: txt, obs: obs, tipo: 'planilha', foto: false, critico: false, produtos: pendingPlanilhaProdutos.slice() });
+    pendingPlanilhaProdutos = null;
+    var csvInput = document.getElementById('ncl-planilha-csv');
+    if (csvInput) csvInput.value = '';
+    var info = document.getElementById('ncl-planilha-info');
+    if (info) info.textContent = 'Formato: uma linha por produto — código, descrição, setor';
+  } else {
+    var foto = fotoVal !== 'none' ? fotoVal : false;
+    var critico = criticoEl ? criticoEl.checked : false;
+    nclItens.push({ t: txt, obs: obs, foto: foto, tipo: tipo, critico: critico });
+  }
   document.getElementById('ncl-item-txt').value='';
   document.getElementById('ncl-item-obs').value='';
   document.getElementById('ncl-item-foto').value='none';
-  var tipoEl = document.getElementById('ncl-item-tipo'); if (tipoEl) tipoEl.value='checkbox';
+  var tipoEl = document.getElementById('ncl-item-tipo');
+  if (tipoEl) { tipoEl.value='checkbox'; togglePlanilhaRow(tipoEl); }
   if (criticoEl) criticoEl.checked = false;
   renderNclItens();
   document.getElementById('ncl-item-txt').focus();
@@ -1762,7 +1909,7 @@ function renderNclItens() {
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:13px;font-weight:500">'+item.t+'</div>'
       +(item.obs ? '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+item.obs+'</div>' : '')
-      +(item.tipo && item.tipo!=='checkbox' ? '<div style="font-size:11px;color:var(--bl);margin-top:2px">'+({simNao:'✅ Sim/Não',nota:'⭐ Nota 1–5',texto:'📝 Texto'}[item.tipo]||'')+'</div>' : '')
+      +(item.tipo && item.tipo!=='checkbox' ? '<div style="font-size:11px;color:var(--bl);margin-top:2px">'+({simNao:'✅ Sim/Não',nota:'⭐ Nota 1–5',texto:'📝 Texto',planilha:'📊 Planilha de Contagem'}[item.tipo]||'')+(item.tipo==='planilha'&&item.produtos?' ('+item.produtos.length+' produtos)':'')+'</div>' : '')
       +(item.foto && item.foto!=='none' ? '<div style="font-size:11px;color:var(--g);margin-top:2px">'+(item.foto==='antes_depois'?'📷📷 Foto antes e depois':'📷 Foto depois')+'</div>' : '')
       +(item.critico ? '<div style="font-size:11px;font-weight:700;color:var(--r);margin-top:2px">⚠️ Item Crítico — reprova a inspeção inteira</div>' : '')
       +'</div>'

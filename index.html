@@ -818,11 +818,12 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="ncl-item-obs" type="text" placeholder="Observação / instrução extra (opcional)" style="flex:1;min-width:160px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff"/>
-        <select id="ncl-item-tipo" style="padding:8px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff">
+        <select id="ncl-item-tipo" onchange="togglePlanilhaRow(this)" style="padding:8px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff">
           <option value="checkbox">☑ Checkbox</option>
           <option value="simNao">✅ Sim/Não</option>
           <option value="nota">⭐ Nota 1–5</option>
           <option value="texto">📝 Texto</option>
+          <option value="planilha">📊 Planilha</option>
         </select>
         <select id="ncl-item-foto" style="padding:8px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff">
           <option value="none">Sem foto</option>
@@ -833,6 +834,11 @@
           <input type="checkbox" id="ncl-item-critico" style="accent-color:var(--r);width:15px;height:15px"/> ⚠️ Crítico
         </label>
         <button class="btn btn-p btn-sm" onclick="addItemNCL()">+ Adicionar</button>
+      </div>
+      <div id="ncl-planilha-row" style="display:none;margin-top:8px">
+        <label style="font-size:12px;color:var(--t2);font-weight:600;display:block;margin-bottom:4px">Arquivo CSV com produtos (código de barras, descrição, setor)</label>
+        <input type="file" id="ncl-planilha-csv" accept=".csv,.txt" onchange="onPlanilhaCSVChange(this)" style="font-size:12px;width:100%;padding:6px;border:1.5px solid var(--gray2);border-radius:8px;background:#fff"/>
+        <div id="ncl-planilha-info" style="font-size:11px;color:var(--t3);margin-top:4px">Formato: uma linha por produto — código, descrição, setor (separado por vírgula ou ponto e vírgula)</div>
       </div>
     </div>
     <div class="modal-err" id="mcl-err"></div>
