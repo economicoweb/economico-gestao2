@@ -3831,13 +3831,13 @@ var planoFiltroAtual = 'aberto';
 
 function getPlanos() { try { return JSON.parse(localStorage.getItem(PLANO_KEY)||'[]'); } catch(e){ return []; } }
 function savePlanos(list) {
-  localStorage.setItem(PLANO_KEY, JSON.stringify(list));
+  try { localStorage.setItem(PLANO_KEY, JSON.stringify(list)); } catch(e) {}
   list.forEach(function(p){ db.collection('planos').doc(p.id).set(p).catch(function(){}); });
 }
 function loadPlanosFromFirebase(cb) {
   db.collection('planos').get().then(function(snap){
     var list = snap.docs.map(function(d){ return d.data(); });
-    localStorage.setItem(PLANO_KEY, JSON.stringify(list));
+    try { localStorage.setItem(PLANO_KEY, JSON.stringify(list)); } catch(e) {}
     if (cb) cb();
   }).catch(function(){ if (cb) cb(); });
 }
@@ -3878,8 +3878,14 @@ function salvarPlano() {
 function atualizarStatusPlano(id, novoStatus) {
   var list = getPlanos().map(function(p){ return p.id===id ? Object.assign({},p,{status:novoStatus, resolvidoEm: novoStatus==='resolvido'?new Date().toLocaleString('pt-BR'):p.resolvidoEm}) : p; });
   savePlanos(list);
-  renderPlanos(planoFiltroAtual);
-  atualizarBadgePlano();
+  var msgs = {andamento:'▶ Plano iniciado!', resolvido:'✅ Plano resolvido!', aberto:'🔄 Plano reaberto!'};
+  showToast(msgs[novoStatus]||'Status atualizado');
+  var tabEl = null;
+  if (novoStatus==='andamento') tabEl = document.querySelector('#plano-filter-tabs .tab:nth-child(2)');
+  else if (novoStatus==='resolvido') tabEl = document.querySelector('#plano-filter-tabs .tab:nth-child(3)');
+  else if (novoStatus==='aberto') tabEl = document.querySelector('#plano-filter-tabs .tab:nth-child(1)');
+  if (tabEl) filtrarPlanos(novoStatus, tabEl);
+  else { renderPlanos(planoFiltroAtual); atualizarBadgePlano(); }
 }
 
 function filtrarPlanos(filtro, el) {
