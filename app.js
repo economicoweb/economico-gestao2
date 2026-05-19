@@ -1716,6 +1716,63 @@ function renderNclPlanilhaLojas() {
   }).join('');
 }
 
+function onDiariaCSVChange(input) {
+  var file = input.files[0];
+  if (!file) { pendingDiariaProdutos = null; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    pendingDiariaProdutos = parseCSV(e.target.result);
+    var info = document.getElementById('ncl-diaria-info');
+    if (info) info.textContent = pendingDiariaProdutos.length + ' produtos carregados — clique "+ Loja" para adicionar';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function adicionarLojaDiaria() {
+  var lojaInput = document.getElementById('ncl-diaria-loja-nome');
+  var loja = lojaInput ? lojaInput.value.trim() : '';
+  if (!loja) { showToast('Informe o nome da loja'); return; }
+  if (!pendingDiariaProdutos || !pendingDiariaProdutos.length) { showToast('Selecione o arquivo CSV primeiro'); return; }
+  var hoje = new Date().toISOString().slice(0, 10);
+  var clId = pendingCLId || editingCLId || genId();
+  var itemIdxDiaria = '_editor_'; // placeholder até o item ter índice real
+  pendingDiariaLojas[loja] = pendingDiariaProdutos.slice();
+  // Salva imediatamente no Firebase para compartilhar com operadores
+  var docId = clId + '_diaria_0_' + loja + '_' + hoje;
+  db.collection('contagens').doc(docId).set({
+    id: docId, tipo: 'planilha_diaria',
+    checklistId: clId, itemIdx: 0, loja: loja,
+    data: hoje, expireAt: proximaMeiaNoite(),
+    produtos: pendingDiariaProdutos.slice()
+  }).catch(function(){});
+  _planilhaTemplates[clId + '_0_' + loja] = pendingDiariaProdutos.slice();
+  pendingDiariaProdutos = null;
+  if (lojaInput) lojaInput.value = '';
+  var csvInput = document.getElementById('ncl-diaria-csv');
+  if (csvInput) csvInput.value = '';
+  var info = document.getElementById('ncl-diaria-info');
+  if (info) info.textContent = 'Formato: código, descrição, setor — um produto por linha';
+  renderNclDiariaLojas();
+}
+
+function removerLojaDiaria(loja) {
+  delete pendingDiariaLojas[loja];
+  renderNclDiariaLojas();
+}
+
+function renderNclDiariaLojas() {
+  var wrap = document.getElementById('ncl-diaria-lojas-lista');
+  if (!wrap) return;
+  var keys = Object.keys(pendingDiariaLojas);
+  if (!keys.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = keys.map(function(loja) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#e8f4fd;border-radius:8px;margin-bottom:4px">'
+      +'<span style="flex:1;font-size:12px;font-weight:600">🏪 '+loja+' — '+pendingDiariaLojas[loja].length+' produtos ✓</span>'
+      +'<button onclick="removerLojaDiaria(\''+loja+'\')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:15px;line-height:1">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
 function uploadDiariaPorLoja(clId, itemIdx, lojaParam, fileInput) {
   var file = fileInput.files[0];
   if (!file) return;
@@ -2009,11 +2066,16 @@ function cancelarEnviar() {
 // ===========================================
 var nclItens = [];
 var editingCLId = null;
+var pendingCLId = null;
+var pendingDiariaProdutos = null;
+var pendingDiariaLojas = {};
 var clFiltro = 'todos';
 var pendingExcluirId = null;
 
 function abrirModalCL() {
   editingCLId = null;
+  pendingCLId = genId();
+  pendingDiariaLojas = {}; pendingDiariaProdutos = null;
   nclItens = [];
   document.getElementById('mcl-title').textContent = 'Novo Checklist';
   ['ncl-nome','ncl-desc','ncl-item-txt','ncl-item-obs'].forEach(function(id){document.getElementById(id).value='';}); document.getElementById('ncl-item-foto').value='none'; var _t=document.getElementById('ncl-item-tipo'); if(_t)_t.value='checkbox';
@@ -2030,8 +2092,10 @@ function abrirModalCL() {
 
 function fecharModalCL() {
   document.getElementById('modal-cl').style.display='none';
-  nclItens=[]; editingCLId=null;
+  nclItens=[]; editingCLId=null; pendingCLId=null;
   pendingPlanilhaLojas={}; pendingPlanilhaProdutos=null;
+  pendingDiariaLojas={}; pendingDiariaProdutos=null;
+  renderNclDiariaLojas();
   renderNclPlanilhaLojas();
   var pr=document.getElementById('ncl-planilha-row'); if(pr) pr.style.display='none';
   var fs=document.getElementById('ncl-item-foto'); if(fs) fs.style.display='';
@@ -2123,7 +2187,7 @@ function salvarCL() {
   if (editingCLId) {
     list = list.map(function(cl){ return cl.id===editingCLId ? Object.assign({},cl,{nome:nome,setor:setor,perfil:perfil,turno:turno,desc:desc,itens:nclItens.slice(),diasObrigatorios:diasObrigatorios,horaLimite:horaLimite}) : cl; });
   } else {
-    list.push({id:genId(),nome:nome,setor:setor,perfil:perfil,turno:turno,desc:desc,itens:nclItens.slice(),diasObrigatorios:diasObrigatorios,horaLimite:horaLimite,criadoEm:new Date().toLocaleString('pt-BR'),criadoPor:S.currentUser?S.currentUser.nome:'Admin'});
+    list.push({id:pendingCLId||genId(),nome:nome,setor:setor,perfil:perfil,turno:turno,desc:desc,itens:nclItens.slice(),diasObrigatorios:diasObrigatorios,horaLimite:horaLimite,criadoEm:new Date().toLocaleString('pt-BR'),criadoPor:S.currentUser?S.currentUser.nome:'Admin'});
   }
   saveCustomCLs(list);
   fecharModalCL();
@@ -2135,6 +2199,8 @@ function editarCL(id) {
   var cl = getCustomCLs().find(function(x){return x.id===id;});
   if (!cl) return;
   editingCLId = id;
+  pendingCLId = id;
+  pendingDiariaLojas = {}; pendingDiariaProdutos = null;
   nclItens = cl.itens.slice();
   document.getElementById('mcl-title').textContent='Editar Checklist';
   document.getElementById('ncl-nome').value=cl.nome;
