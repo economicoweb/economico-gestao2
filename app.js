@@ -603,6 +603,7 @@ function finalizarLogin(found) {
 
   function iniciarApp() {
     limparContagensAntigas();
+    loadPlanilhasDiarias();
     // Load inv and perdas for this user/day
     loadInvFromFirebase(function(){
       loadPerdasFromFirebase(function(){
@@ -1057,15 +1058,38 @@ function buildCLBlock(cl) {
       var hoje = new Date().toISOString().slice(0, 10);
       var produtos = [];
       if (modoPlanilha === 'diaria') {
-        var diariaKey = cl.id + '_diaria_' + i + '_' + hoje;
-        try { produtos = JSON.parse(S.checkState[diariaKey] || '[]'); } catch(e) { produtos = []; }
-        if (!produtos.length && !jaConcluido) {
-          belowHtml = '<div style="margin-top:10px;padding:14px;border:2px dashed var(--gray2);border-radius:8px;text-align:center">'
-            +'<div style="font-size:13px;color:var(--t2);margin-bottom:8px">📅 Planilha de hoje não carregada</div>'
-            +'<input type="file" id="diaria-file-'+cl.id+'-'+i+'" accept=".csv,.txt" style="display:none" onchange="uploadPlanilhaDiaria(\''+cl.id+'\','+i+',this)" onclick="event.stopPropagation()">'
-            +'<button class="btn btn-s btn-sm" onclick="event.stopPropagation();document.getElementById(\'diaria-file-'+cl.id+'-'+i+'\').click()">📂 Carregar Planilha de Hoje</button>'
+        var isAdmGer = S.role === 'admin' || S.role === 'gerencia';
+        if (isAdmGer) {
+          // Central: mostra uploads já feitos hoje + interface para upload por loja
+          var lojasHoje = Object.keys(_planilhaTemplates).filter(function(k) {
+            return k.indexOf(cl.id + '_' + i + '_') === 0;
+          }).map(function(k) { return k.replace(cl.id + '_' + i + '_', ''); });
+          var admHtml = '<div style="margin-top:10px;background:var(--gray);border-radius:8px;padding:10px">'
+            +'<div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">📅 Planilha diária — upload por loja</div>';
+          if (lojasHoje.length) {
+            admHtml += lojasHoje.map(function(lj) {
+              var cnt = (_planilhaTemplates[cl.id+'_'+i+'_'+lj]||[]).length;
+              return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#fff;border-radius:6px;margin-bottom:4px;font-size:12px">'
+                +'<span style="flex:1">🏪 '+lj+' — '+cnt+' produtos</span>'
+                +'<input type="file" id="diaria-upd-'+cl.id+'-'+i+'-'+lj+'" accept=".csv,.txt" style="display:none" onchange="uploadDiariaPorLoja(\''+cl.id+'\','+i+',\''+lj+'\',this)" onclick="event.stopPropagation()">'
+                +'<button class="btn btn-s btn-sm" onclick="event.stopPropagation();document.getElementById(\'diaria-upd-'+cl.id+'-'+i+'-'+lj+'\').click()" style="font-size:10px">🔄 Atualizar</button>'
+                +'</div>';
+            }).join('');
+          }
+          admHtml += '<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">'
+            +'<input type="text" id="diaria-loja-'+cl.id+'-'+i+'" placeholder="Nome da loja" onclick="event.stopPropagation()" style="flex:1;min-width:110px;padding:6px 8px;border:1.5px solid var(--gray2);border-radius:6px;font-size:12px;font-family:inherit">'
+            +'<input type="file" id="diaria-file-'+cl.id+'-'+i+'" accept=".csv,.txt" style="display:none" onchange="uploadDiariaPorLoja(\''+cl.id+'\','+i+',null,this)" onclick="event.stopPropagation()">'
+            +'<button class="btn btn-p btn-sm" onclick="event.stopPropagation();document.getElementById(\'diaria-file-'+cl.id+'-'+i+'\').click()">+ Carregar loja</button>'
+            +'</div>'
             +'</div>';
-          S.checkState[cl.id+'_'+item.t] = '';
+          belowHtml = admHtml;
+        } else {
+          // Operador: busca produtos da sua loja no template do dia
+          produtos = _planilhaTemplates[cl.id + '_' + i + '_' + userLoja] || [];
+          if (!produtos.length) {
+            belowHtml = '<div style="margin-top:10px;padding:12px;background:var(--gray);border-radius:8px;text-align:center;font-size:12px;color:var(--t3)">⏳ Aguardando planilha de hoje (Central ainda não fez o upload)</div>';
+            S.checkState[cl.id+'_'+item.t] = '';
+          }
         }
       } else {
         produtos = item.lojas ? (item.lojas[userLoja] || []) : (item.produtos || []);
@@ -1692,23 +1716,36 @@ function renderNclPlanilhaLojas() {
   }).join('');
 }
 
-function uploadPlanilhaDiaria(clId, itemIdx, fileInput) {
+function uploadDiariaPorLoja(clId, itemIdx, lojaParam, fileInput) {
   var file = fileInput.files[0];
   if (!file) return;
+  var loja = lojaParam;
+  if (!loja) {
+    var lojaInput = document.getElementById('diaria-loja-' + clId + '-' + itemIdx);
+    loja = lojaInput ? lojaInput.value.trim() : '';
+  }
+  if (!loja) { showToast('Informe o nome da loja'); return; }
   var reader = new FileReader();
   reader.onload = function(e) {
     var produtos = parseCSV(e.target.result);
     if (!produtos.length) { showToast('Nenhum produto encontrado no CSV'); return; }
     var hoje = new Date().toISOString().slice(0, 10);
-    var diariaKey = clId + '_diaria_' + itemIdx + '_' + hoje;
-    S.checkState[diariaKey] = JSON.stringify(produtos);
-    saveCheckState();
+    var docId = clId + '_diaria_' + itemIdx + '_' + loja + '_' + hoje;
+    var doc = {
+      id: docId, tipo: 'planilha_diaria',
+      checklistId: clId, itemIdx: itemIdx, loja: loja,
+      data: hoje, expireAt: proximaMeiaNoite(), produtos: produtos
+    };
+    db.collection('contagens').doc(docId).set(doc).catch(function(){});
+    _planilhaTemplates[clId + '_' + itemIdx + '_' + loja] = produtos;
     var cl = getMyCLs().find(function(c) { return c.id === clId; });
     if (cl) {
       var block = document.getElementById('cl-block-' + clId);
       if (block) block.innerHTML = buildCLBlock(cl);
     }
-    showToast(produtos.length + ' produtos carregados!');
+    var liInput = document.getElementById('diaria-loja-' + clId + '-' + itemIdx);
+    if (liInput) liInput.value = '';
+    showToast('🏪 ' + loja + ' — ' + produtos.length + ' produtos carregados!');
   };
   reader.readAsText(file, 'UTF-8');
 }
@@ -1721,11 +1758,11 @@ function salvarQuantidade(clId, itemIdx, codigo, val) {
   if (!item || item.tipo !== 'planilha') return;
   var produtos = [];
   if ((item.modoPlanilha || 'fixa') === 'diaria') {
-    var hoje = new Date().toISOString().slice(0, 10);
-    try { produtos = JSON.parse(S.checkState[clId + '_diaria_' + itemIdx + '_' + hoje] || '[]'); } catch(e) { produtos = []; }
+    var uLojaSQ = S.currentUser ? (S.currentUser.loja || '') : '';
+    produtos = _planilhaTemplates[clId + '_' + itemIdx + '_' + uLojaSQ] || [];
   } else {
-    var userLoja = S.currentUser ? (S.currentUser.loja || '') : '';
-    produtos = item.lojas ? (item.lojas[userLoja] || []) : (item.produtos || []);
+    var userLojaSQ = S.currentUser ? (S.currentUser.loja || '') : '';
+    produtos = item.lojas ? (item.lojas[userLojaSQ] || []) : (item.produtos || []);
   }
   var allFilled = produtos.every(function(p) {
     var v = S.checkState[clId + '_qty_' + itemIdx + '_' + p.codigo];
@@ -1744,16 +1781,21 @@ function limparContagensAntigas() {
       }
     });
   }).catch(function() {});
-  // Limpa chaves de planilha diária antigas do checkState
-  var keysAntigos = Object.keys(S.checkState || {}).filter(function(k) {
-    if (k.indexOf('_diaria_') === -1) return false;
-    var datePart = k.slice(-10);
-    return /^\d{4}-\d{2}-\d{2}$/.test(datePart) && datePart < hoje;
-  });
-  if (keysAntigos.length) {
-    keysAntigos.forEach(function(k) { delete S.checkState[k]; });
-    saveCheckState();
-  }
+}
+
+function loadPlanilhasDiarias(cb) {
+  var hoje = new Date().toISOString().slice(0, 10);
+  db.collection('contagens').get().then(function(snap) {
+    _planilhaTemplates = {};
+    snap.docs.forEach(function(doc) {
+      var d = doc.data();
+      if (d.tipo === 'planilha_diaria' && d.data === hoje) {
+        var key = (d.checklistId || '') + '_' + (d.itemIdx !== undefined ? d.itemIdx : '') + '_' + (d.loja || '');
+        _planilhaTemplates[key] = d.produtos || [];
+      }
+    });
+    if (cb) cb();
+  }).catch(function() { if (cb) cb(); });
 }
 
 function jaEnviouHoje(clId) {
@@ -1863,8 +1905,7 @@ function confirmarEnviar(assinatura) {
       var uLoja = S.currentUser ? (S.currentUser.loja || '') : '';
       var lojaProds = [];
       if ((item.modoPlanilha || 'fixa') === 'diaria') {
-        var hojeDiaria = new Date().toISOString().slice(0, 10);
-        try { lojaProds = JSON.parse(S.checkState[clId+'_diaria_'+idx+'_'+hojeDiaria] || '[]'); } catch(e) { lojaProds = []; }
+        lojaProds = _planilhaTemplates[clId + '_' + idx + '_' + uLoja] || [];
       } else {
         lojaProds = item.lojas ? (item.lojas[uLoja] || []) : (item.produtos || []);
       }
@@ -1923,8 +1964,7 @@ function confirmarEnviar(assinatura) {
     var uLoja2 = S.currentUser ? (S.currentUser.loja || '') : '';
     var lojaProds2 = [];
     if ((clItem.modoPlanilha || 'fixa') === 'diaria') {
-      var hojeCtg = new Date().toISOString().slice(0, 10);
-      try { lojaProds2 = JSON.parse(S.checkState[clId+'_diaria_'+idx+'_'+hojeCtg] || '[]'); } catch(e) { lojaProds2 = []; }
+      lojaProds2 = _planilhaTemplates[clId + '_' + idx + '_' + uLoja2] || [];
     } else {
       lojaProds2 = clItem.lojas ? (clItem.lojas[uLoja2] || []) : (clItem.produtos || []);
     }
@@ -3909,6 +3949,8 @@ function exportarRelatorioSupervisor() {
 // ===========================================
 var editingPlanoId = null;
 var planoFiltroAtual = 'aberto';
+
+var _planilhaTemplates = {}; // { "clId_itemIdx_loja": [...produtos] } — planilhas diárias carregadas do Firebase
 
 var _planosCache = null;
 function getPlanos() {
