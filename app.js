@@ -3933,6 +3933,26 @@ function renderRelRanking() {
   }).join('') : '<tr class="erow"><td colspan="6">Nenhum dado — cadastre a loja nos usuários</td></tr>';
 }
 
+// Clona elemento substituindo <canvas> por <img> com o conteúdo desenhado
+function _cloneComImagens(containerEl) {
+  var clone = containerEl.cloneNode(true);
+  var origCanvases = containerEl.querySelectorAll('canvas');
+  var cloneCanvases = clone.querySelectorAll('canvas');
+  origCanvases.forEach(function(canvas, i) {
+    try {
+      var dataUrl = canvas.toDataURL('image/png');
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      var w = canvas.offsetWidth || canvas.width || 0;
+      var h = canvas.offsetHeight || canvas.height || 0;
+      img.style.cssText = 'display:block;max-width:100%;' + (w ? 'width:'+w+'px;' : '') + (h ? 'height:'+h+'px;' : '');
+      var cl = cloneCanvases[i];
+      if (cl && cl.parentNode) cl.parentNode.replaceChild(img, cl);
+    } catch(e) {}
+  });
+  return clone.innerHTML;
+}
+
 // ── Exportar PDF ──
 function exportarRelatorioSupervisor() {
   var logoEl = document.querySelector('.sb-logo img');
@@ -4438,7 +4458,7 @@ function exportarPDF(tipo) {
   var idMap = {executivo:'rel-cl-executivo',naoconformidade:'rel-cl-naoconformidade',ranking:'rel-cl-ranking',checklist:'rel-cl-geral',inventario:'rel-tab-inventario',perdas:'rel-tab-perdas'};
   var tabEl = document.getElementById(idMap[tipo]||'rel-cl-geral');
   if (!tabEl) { showToast('Erro: aba nao encontrada'); return; }
-  var conteudo = tabEl.innerHTML;
+  var conteudo = _cloneComImagens(tabEl);
 
   var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>'
     +'<title>'+titulo+'</title>'
@@ -4459,7 +4479,6 @@ function exportarPDF(tipo) {
     +'th{background:#FFC600;padding:8px;text-align:left;font-size:10px;text-transform:uppercase}'
     +'td{padding:7px 8px;border-bottom:1px solid #eee}'
     +'.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:10px;color:#999}'
-    +'canvas{display:none}'
     +'button{display:none}'
     +'select{display:none}'
     +'input{display:none}'
@@ -5004,7 +5023,7 @@ function exportarPDFConsolidado() {
   var secoes = ['rel-corp-adesao','rel-corp-naoconf','rel-corp-comparativo','rel-corp-pontualidade'];
   var conteudo = secoes.map(function(id){
     var el=document.getElementById(id);
-    return el ? '<div style="page-break-inside:avoid;margin-bottom:30px">'+el.innerHTML+'</div>' : '';
+    return el ? '<div style="page-break-inside:avoid;margin-bottom:30px">'+_cloneComImagens(el)+'</div>' : '';
   }).join('');
 
   var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Relatório Corporativo Consolidado</title>'
@@ -5023,7 +5042,7 @@ function exportarPDFConsolidado() {
     +'td{padding:7px 8px;border-bottom:1px solid #eee}'
     +'.card{border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:16px}'
     +'.card-hdr{margin-bottom:10px;font-weight:700}'
-    +'canvas,button,select,input{display:none}'
+    +'button,select,input{display:none}'
     +'@media print{.no-print{display:none}}'
     +'</style></head><body>'
     +'<div class="header">'
