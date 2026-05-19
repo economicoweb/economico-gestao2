@@ -852,6 +852,17 @@
         </label>
         <button class="btn btn-p btn-sm" onclick="addItemNCL()">+ Adicionar</button>
       </div>
+      <div id="ncl-simnao-prazo-row" style="display:none;margin-top:6px;padding:7px 10px;background:#fff8e1;border-left:3px solid #f39c12;border-radius:6px;font-size:12px">
+        <span style="color:var(--t2);font-weight:600">⏱ Prazo padrão do plano de ação gerado ao marcar "Não":</span>
+        <select id="ncl-item-prazo-plano" style="margin-left:8px;padding:5px 8px;border:1.5px solid var(--gray2);border-radius:6px;font-size:12px;font-family:inherit;background:#fff">
+          <option value="24">24 horas (1 dia)</option>
+          <option value="48">48 horas (2 dias)</option>
+          <option value="72" selected>72 horas (3 dias)</option>
+          <option value="120">120 horas (5 dias)</option>
+          <option value="168">168 horas (7 dias)</option>
+          <option value="336">336 horas (14 dias)</option>
+        </select>
+      </div>
       <div id="ncl-planilha-row" style="display:none;margin-top:8px">
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:7px 10px;background:var(--gray);border-radius:8px">
           <span style="font-size:12px;font-weight:600;color:var(--t2)">Modo:</span>

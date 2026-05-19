@@ -1656,10 +1656,13 @@ function parseCSV(text) {
 function togglePlanilhaRow(sel) {
   var row = document.getElementById('ncl-planilha-row');
   var fotoSel = document.getElementById('ncl-item-foto');
+  var prazoRow = document.getElementById('ncl-simnao-prazo-row');
   if (!row) return;
   var isPlanilha = sel.value === 'planilha';
+  var isSimNao = sel.value === 'simNao';
   row.style.display = isPlanilha ? 'block' : 'none';
   if (fotoSel) fotoSel.style.display = isPlanilha ? 'none' : '';
+  if (prazoRow) prazoRow.style.display = isSimNao ? 'block' : 'none';
   if (isPlanilha) {
     var modoInputs = document.querySelectorAll('input[name="ncl-planilha-modo"]');
     modoInputs.forEach(function(inp){ inp.checked = inp.value === 'fixa'; });
@@ -1994,6 +1997,7 @@ function confirmarEnviar(assinatura) {
       fotoAntes:S.checkState[clId+'_foto_antes_'+idx]||null,
       fotoDepois:S.checkState[clId+'_foto_depois_'+idx]||S.checkState[clId+'_foto_'+idx]||null,
       feito:!!val, critico:!!item.critico,
+      prazoPlano: item.prazoPlano || 72,
       produtos: itemProdutos
     };
   });
@@ -2056,7 +2060,7 @@ function confirmarEnviar(assinatura) {
   // Auto-criar planos de ação para itens Sim/Não com resposta "Não"
   snapshot.forEach(function(item) {
     if (item.tipo==='simNao' && item.resposta==='nao') {
-      criarPlanoAuto(label, item.texto, item.justificativa||'', setor);
+      criarPlanoAuto(label, item.texto, item.justificativa||'', setor, item.prazoPlano||72);
     }
   });
   addHist('Checklist','"'+label+'" enviado ('+pct+'%)','Geral',pct===100?'st-ok':'st-warn',pct+'%');
@@ -2149,7 +2153,9 @@ function addItemNCL() {
   } else {
     var foto = fotoVal !== 'none' ? fotoVal : false;
     var critico = criticoEl ? criticoEl.checked : false;
-    nclItens.push({ t: txt, obs: obs, foto: foto, tipo: tipo, critico: critico });
+    var prazoPlanoEl = document.getElementById('ncl-item-prazo-plano');
+    var prazoPlano = (tipo === 'simNao' && prazoPlanoEl) ? parseInt(prazoPlanoEl.value || '72') : 72;
+    nclItens.push({ t: txt, obs: obs, foto: foto, tipo: tipo, critico: critico, prazoPlano: prazoPlano });
   }
   document.getElementById('ncl-item-txt').value='';
   document.getElementById('ncl-item-obs').value='';
@@ -2157,6 +2163,8 @@ function addItemNCL() {
   var tipoEl = document.getElementById('ncl-item-tipo');
   if (tipoEl) { tipoEl.value='checkbox'; togglePlanilhaRow(tipoEl); }
   if (criticoEl) criticoEl.checked = false;
+  var prazoPlanoResetEl = document.getElementById('ncl-item-prazo-plano');
+  if (prazoPlanoResetEl) prazoPlanoResetEl.value = '72';
   renderNclItens();
   document.getElementById('ncl-item-txt').focus();
 }
@@ -4470,11 +4478,11 @@ function atualizarBadgePlano() {
   else { badge.style.display='none'; }
 }
 
-function criarPlanoAuto(checklistNome, itemTexto, justificativa, setor) {
+function criarPlanoAuto(checklistNome, itemTexto, justificativa, setor, prazoHoras) {
   var loja = S.currentUser ? (S.currentUser.loja||'') : '';
   var list = getPlanos();
   var desc = '['+checklistNome+'] '+itemTexto;
-  var prazoHoras = 72;
+  prazoHoras = prazoHoras || 72;
   var prazoFim = new Date(Date.now() + prazoHoras * 3600000).toISOString();
   list.push({id:genId(),desc:desc,responsavel:'',prazo:'',origem:checklistNome,obs:justificativa||'',status:'aberto',loja:loja,setor:setor||'',criadoEm:new Date().toLocaleString('pt-BR'),criadoPor:S.currentUser?S.currentUser.nome:'—',prazoHoras:prazoHoras,prazoFim:prazoFim,mensagem:'',prorrogacoes:[]});
   savePlanos(list);
