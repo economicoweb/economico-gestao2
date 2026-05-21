@@ -475,7 +475,7 @@ function notificarPendencias(pendencias) {
     ? 'Checklist pendente: ' + atrasados[0].cl.nome
     : atrasados.length + ' checklists obrigatórios em atraso!';
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('⚠️ Cahu360 — Pendências', {body: msg, icon: './logo.png'});
+    new Notification('⚠️ Fluxo Certo 360 — Pendências', {body: msg, icon: './logo.png'});
   } else {
     showToast('⚠️ ' + msg, 6000);
   }
@@ -933,8 +933,9 @@ function buildCLTabs() {
 }
 
 function buildCLBlock(cl) {
-  var done = cl.itens.filter(function(i){ return S.checkState[cl.id+'_'+i.t]; }).length;
-  var total = cl.itens.length;
+  var itensAtivos = cl.itens.filter(function(i){ return !_planoAbertoDoItem(cl.label, i.t); });
+  var done = itensAtivos.filter(function(i){ return S.checkState[cl.id+'_'+i.t]; }).length;
+  var total = itensAtivos.length;
   var pct = total ? Math.round(done/total*100) : 0;
   var jaConcluido = jaEnviouHoje(cl.id);
   // Verifica se algum item crítico está reprovado (simNao=nao ou checkbox=false)
@@ -946,6 +947,17 @@ function buildCLBlock(cl) {
   });
 
   var items = cl.itens.map(function(item,i){
+    var planoDoItem = _planoAbertoDoItem(cl.label, item.t);
+    if (planoDoItem) {
+      var statusLabel = {'aberto':'Em aberto','em-andamento':'Em andamento'}[planoDoItem.status] || planoDoItem.status;
+      return '<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:12px 14px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">'
+        + '<div style="font-size:20px;flex-shrink:0;margin-top:2px">📋</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:600;font-size:13px;color:var(--t);margin-bottom:4px">'+item.t+'</div>'
+        + '<div style="font-size:12px;color:#92400e;font-weight:500">Plano de Ação <strong>'+statusLabel+'</strong> — continue o checklist normalmente</div>'
+        + '</div>'
+        + '</div>';
+    }
     var key = cl.id + '_' + item.t;
     var on = S.checkState[key] ? true : false;
     var fotoHtml = '';
@@ -1330,8 +1342,9 @@ function salvarFotoTipo(clId, idx, tipo, input) {
 }
 
 function updateCLProg(cl) {
-  var done = cl.itens.filter(function(i){return S.checkState[cl.id+'_'+i.t];}).length;
-  var total = cl.itens.length;
+  var itensAtivos2 = cl.itens.filter(function(i){return !_planoAbertoDoItem(cl.label, i.t);});
+  var done = itensAtivos2.filter(function(i){return S.checkState[cl.id+'_'+i.t];}).length;
+  var total = itensAtivos2.length;
   var pct = total ? Math.round(done/total*100) : 0;
   var f = document.getElementById('pf-'+cl.id);
   var t = document.getElementById('pt-'+cl.id);
@@ -1425,8 +1438,7 @@ function confirmarReset() {
       var usuariosEnviaram = [];
       snap.docs.forEach(function(doc){
         var r = doc.data();
-        // Only show users who sent TODAY with 100%
-        if (r.dataHora && r.dataHora.indexOf(hoje)===0 && r.pct===100) {
+        if (r.dataHora && r.dataHora.indexOf(hoje)===0 && !r.resetado) {
           var jaAdded = usuariosEnviaram.some(function(u){return u.nome===r.operador;});
           if (!jaAdded) usuariosEnviaram.push({nome:r.operador, perfil:r.perfil, pct:r.pct});
         }
@@ -1438,7 +1450,7 @@ function confirmarReset() {
       var resultados = getResultados();
       var usuariosEnviaram = [];
       resultados.forEach(function(r){
-        if (r.checklistId===pendingResetClId && r.dataHora && r.dataHora.indexOf(hoje)===0 && r.pct===100) {
+        if (r.checklistId===pendingResetClId && r.dataHora && r.dataHora.indexOf(hoje)===0 && !r.resetado) {
           var jaAdded = usuariosEnviaram.some(function(u){return u.nome===r.operador;});
           if (!jaAdded) usuariosEnviaram.push({nome:r.operador, perfil:r.perfil, pct:r.pct});
         }
@@ -1450,7 +1462,7 @@ function confirmarReset() {
 function renderResetUsers(usuariosEnviaram) {
   var wrap = document.getElementById('reset-users-wrap');
   if (!usuariosEnviaram.length) {
-    wrap.innerHTML = '<div style="font-size:13px;color:var(--t3);padding:16px;text-align:center;background:var(--gray);border-radius:8px">Nenhum usuário enviou este checklist com 100% hoje.</div>';
+    wrap.innerHTML = '<div style="font-size:13px;color:var(--t3);padding:16px;text-align:center;background:var(--gray);border-radius:8px">Nenhum usuário enviou este checklist hoje.</div>';
     wrap._users = [];
     return;
   }
@@ -1464,7 +1476,7 @@ function renderResetUsers(usuariosEnviaram) {
       +'<div style="font-size:13px;font-weight:500">'+u.nome+'</div>'
       +'<div style="font-size:11px;color:var(--t3);margin-top:2px"><span class="st '+(PCLS[u.perfil]||'st-ok')+'">'+(PLABEL[u.perfil]||u.perfil)+'</span></div>'
       +'</div>'
-      +'<span class="st st-ok">100%</span>'
+      +'<span class="st '+(u.pct===100?'st-ok':u.pct>=50?'st-warn':'st-err')+'">'+u.pct+'%</span>'
       +'</div>';
   }).join('');
 }
@@ -1913,8 +1925,8 @@ function enviarCL(clId, label) {
   }
   var cl = getMyCLs().find(function(c){return c.id===clId;});
   if (!cl) return;
-  var feitos = cl.itens.filter(function(i){return !!S.checkState[clId+'_'+i.t];}).length;
-  var total = cl.itens.length;
+  var feitos = cl.itens.filter(function(i){return !_planoAbertoDoItem(label, i.t) && !!S.checkState[clId+'_'+i.t];}).length;
+  var total = cl.itens.filter(function(i){return !_planoAbertoDoItem(label, i.t);}).length;
   var pct = total ? Math.round(feitos/total*100) : 0;
 
   // Bloquear reenvio se já enviou hoje
@@ -2017,11 +2029,12 @@ function confirmarEnviar(assinatura) {
       fotoDepois:S.checkState[clId+'_foto_depois_'+idx]||S.checkState[clId+'_foto_'+idx]||null,
       feito:!!val, critico:!!item.critico,
       prazoPlano: item.prazoPlano || 72,
-      produtos: itemProdutos
+      produtos: itemProdutos,
+      emPlano: !!_planoAbertoDoItem(label, item.t)
     };
   });
-  var feitos = snapshot.filter(function(i){return i.feito;}).length;
-  var total = snapshot.length;
+  var feitos = snapshot.filter(function(i){return i.feito && !i.emPlano;}).length;
+  var total = snapshot.filter(function(i){return !i.emPlano;}).length;
   var pct = total ? Math.round(feitos/total*100) : 0;
   // Verifica se algum item crítico foi reprovado
   var reprovado = snapshot.some(function(item){
@@ -2789,12 +2802,12 @@ function exportarPDFPendencias() {
     +'.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:10px;color:#999}'
     +'</style></head><body>'
     +'<div class="header">'
-    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Cahu360</div>')
+    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Fluxo Certo 360</div>')
     +'<div class="header-info"><h1>Relatório de Pendências por Loja</h1><p>Data: '+dataBR+'</p>'
     +(totalPend?'<p style="color:#c0392b;font-weight:700">'+totalPend+' checklist(s) não enviado(s)</p>':'')
     +'</div></div>'
     +corpo
-    +'<div class="footer"><span>Cahu360 Process © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
+    +'<div class="footer"><span>Fluxo Certo 360 © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
     +'</body></html>';
 
   var blob = new Blob([html], {type:'text/html'});
@@ -3225,7 +3238,7 @@ function updateDash() {
   var resultadosOntem = resultados.filter(function(r){ return r.dataHora && r.dataHora.indexOf(ontemStr)===0; });
 
   // ── Header ──
-  var lojaNome = (S.currentUser && S.currentUser.loja) ? S.currentUser.loja : 'Cahu360';
+  var lojaNome = (S.currentUser && S.currentUser.loja) ? S.currentUser.loja : 'Fluxo Certo 360';
   var dataFull = agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   var lojaNomeEl = document.getElementById('dash-loja-nome');
   var dataFullEl = document.getElementById('dash-data-full');
@@ -4288,7 +4301,7 @@ function exportarRelatorioSupervisor() {
   var hojeStr = agora.toLocaleDateString('pt-BR');
   var hojeExtenso = agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   hojeExtenso = hojeExtenso.charAt(0).toUpperCase()+hojeExtenso.slice(1);
-  var loja = (S.currentUser && S.currentUser.loja) ? S.currentUser.loja : 'Cahu360';
+  var loja = (S.currentUser && S.currentUser.loja) ? S.currentUser.loja : 'Fluxo Certo 360';
 
   var resultados = getResultados();
   var resultadosHoje = resultados.filter(function(r){ return r.dataHora && r.dataHora.indexOf(hojeStr)===0; });
@@ -4377,7 +4390,7 @@ function exportarRelatorioSupervisor() {
 
     // Cabeçalho
     +'<div class="header">'
-    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:18px;font-weight:800">Cahu360</div>')
+    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:18px;font-weight:800">Fluxo Certo 360</div>')
     +'<div class="header-r">'
     +'<h1>Relatório Diário — Prevenção de Perdas</h1>'
     +'<p>'+hojeExtenso+'</p>'
@@ -4413,7 +4426,7 @@ function exportarRelatorioSupervisor() {
     +'<div class="ass-box">Supervisor / Gerente</div>'
     +'</div>'
 
-    +'<div class="footer"><span>Cahu360 Process © '+agora.getFullYear()+'</span><span>Gerado em: '+agora.toLocaleString('pt-BR')+'</span></div>'
+    +'<div class="footer"><span>Fluxo Certo 360 © '+agora.getFullYear()+'</span><span>Gerado em: '+agora.toLocaleString('pt-BR')+'</span></div>'
     +'</body></html>';
 
   var w = window.open('','_blank','width=900,height=700');
@@ -4825,6 +4838,16 @@ function _planosVencidosDoUsuario() {
   });
 }
 
+function _planoAbertoDoItem(clLabel, itemTexto) {
+  var uLoja = S.currentUser ? (S.currentUser.loja||'').toLowerCase() : '';
+  var descAlvo = '['+clLabel+'] '+itemTexto;
+  return getPlanos().find(function(p) {
+    if (p.status === 'resolvido') return false;
+    if (uLoja && (p.loja||'').toLowerCase() !== uLoja) return false;
+    return p.desc === descAlvo;
+  }) || null;
+}
+
 function renderAlertaPlanos() {
   var wrap = document.getElementById('plano-alert-banner');
   if (!wrap) return;
@@ -4999,7 +5022,7 @@ function enviarWhatsApp() {
   var pendencias = getPendencias();
   var hoje = new Date().toLocaleDateString('pt-BR');
   var loja = S.currentUser ? (S.currentUser.loja||'esta loja') : 'esta loja';
-  var msg = '⚠️ *Cahu360 — Checklists Pendentes*\n';
+  var msg = '⚠️ *Fluxo Certo 360 — Checklists Pendentes*\n';
   msg += '📅 '+hoje+' | 🏪 '+loja+'\n\n';
   if (pendencias.length) {
     pendencias.forEach(function(p){ msg += (p.atrasado?'🔴':'🟡')+' '+p.cl.nome+' ('+p.cl.setor+')\n'; });
@@ -5046,11 +5069,11 @@ function exportarPDF(tipo) {
     +'</style>'
     +'</head><body>'
     +'<div class="header">'
-    +(logoSrc ? '<img src="'+logoSrc+'" alt="Logo"/>' : '<div style="font-size:20px;font-weight:700">Cahu360</div>')
-    +'<div class="header-info"><h1>'+titulo+'</h1><p>'+hoje+'</p><p>Cahu360 Process - Gestão Completa. Resultados Reais.</p></div>'
+    +(logoSrc ? '<img src="'+logoSrc+'" alt="Logo"/>' : '<div style="font-size:20px;font-weight:700">Fluxo Certo 360</div>')
+    +'<div class="header-info"><h1>'+titulo+'</h1><p>'+hoje+'</p><p>Fluxo Certo 360</p></div>'
     +'</div>'
     +conteudo
-    +'<div class="footer"><span>Cahu360 Process © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
+    +'<div class="footer"><span>Fluxo Certo 360 © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
     +'</body></html>';
 
   var blob = new Blob([html], {type:'text/html'});
@@ -5656,7 +5679,7 @@ function exportarPDFPlanos() {
     +'.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:10px;color:#999}'
     +'</style></head><body>'
     +'<div class="header">'
-    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Cahu360</div>')
+    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Fluxo Certo 360</div>')
     +'<div class="header-info"><h1>Relatório de Planos de Ação</h1><p>'+hoje+'</p>'
     +(fl?'<p>Loja: '+fl+'</p>':'')+(fst?'<p>Status: '+STATUS_LABEL[fst]+'</p>':'')
     +'</div></div>'
@@ -5671,7 +5694,7 @@ function exportarPDFPlanos() {
       : '')
     +'<div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px">Detalhamento ('+tot+' planos)</div>'
     +listHtml
-    +'<div class="footer"><span>Cahu360 Process © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
+    +'<div class="footer"><span>Fluxo Certo 360 © '+new Date().getFullYear()+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
     +'</body></html>';
 
   var blob = new Blob([html], {type:'text/html'});
@@ -5729,12 +5752,12 @@ function exportarPDFConsolidado() {
     +'@media print{.no-print{display:none}}'
     +'</style></head><body>'
     +'<div class="header">'
-    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Cahu360</div>')
+    +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:20px;font-weight:700">Fluxo Certo 360</div>')
     +'<div class="header-info"><h1>Relatório Corporativo Consolidado</h1><p>Período: '+periodoTxt+'</p><p>Gerado em: '+hoje+'</p></div>'
     +'</div>'
     +conteudo
     +'<div style="margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:10px;color:#999">'
-    +'<span>Cahu360 Process © '+new Date().getFullYear()+'</span><span>'+hoje+'</span></div>'
+    +'<span>Fluxo Certo 360 © '+new Date().getFullYear()+'</span><span>'+hoje+'</span></div>'
     +'</body></html>';
 
   var w = window.open('','_blank','width=900,height=700');
