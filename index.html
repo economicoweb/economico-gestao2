@@ -574,7 +574,7 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
               <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                 <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">Ranking</div>
-                <div class="tabs" style="margin:0"><div class="tab on" id="rank-tab-op" onclick="switchRankView('operadores',this)">Operadores</div><div class="tab" id="rank-tab-loja" onclick="switchRankView('lojas',this)">Lojas</div></div>
+                <div class="tabs" style="margin:0"><div class="tab on" id="rank-tab-op" onclick="switchRankView('operadores',this)">Operadores</div><div class="tab" id="rank-tab-gerencia" onclick="switchRankView('gerencia',this)">Gerência</div><div class="tab" id="rank-tab-prevencao" onclick="switchRankView('prevencao',this)">Prevenção</div><div class="tab" id="rank-tab-loja" onclick="switchRankView('lojas',this)">Lojas</div></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <select id="rank-mes" onchange="renderRelRanking()" style="padding:7px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit">
@@ -595,11 +595,29 @@
                 <tbody id="rank-tbody"><tr class="erow"><td colspan="6">Nenhum dado</td></tr></tbody></table>
               </div>
             </div>
+            <!-- VIEW GERÊNCIA -->
+            <div id="rank-view-gerencia" style="display:none">
+              <div id="rank-gerencia-podio" style="display:flex;gap:12px;justify-content:center;align-items:flex-end;margin-bottom:20px;min-height:140px"></div>
+              <div class="card">
+                <div class="card-hdr"><div class="card-title">Ranking de Gerência</div><div style="font-size:11px;color:var(--t3)">100%=10pts · 80-99%=7pts · 60-79%=4pts · abaixo=1pt</div></div>
+                <table><thead><tr><th>#</th><th>Nome</th><th>Pontos</th><th>Enviados</th><th>100%</th><th>Media %</th></tr></thead>
+                <tbody id="rank-gerencia-tbody"><tr class="erow"><td colspan="6">Nenhum dado</td></tr></tbody></table>
+              </div>
+            </div>
+            <!-- VIEW PREVENÇÃO -->
+            <div id="rank-view-prevencao" style="display:none">
+              <div id="rank-prevencao-podio" style="display:flex;gap:12px;justify-content:center;align-items:flex-end;margin-bottom:20px;min-height:140px"></div>
+              <div class="card">
+                <div class="card-hdr"><div class="card-title">Ranking de Prevenção</div><div style="font-size:11px;color:var(--t3)">100%=10pts · 80-99%=7pts · 60-79%=4pts · abaixo=1pt</div></div>
+                <table><thead><tr><th>#</th><th>Nome</th><th>Pontos</th><th>Enviados</th><th>100%</th><th>Media %</th></tr></thead>
+                <tbody id="rank-prevencao-tbody"><tr class="erow"><td colspan="6">Nenhum dado</td></tr></tbody></table>
+              </div>
+            </div>
             <!-- VIEW LOJAS -->
             <div id="rank-view-lojas" style="display:none">
               <div id="rank-lojas-podio" style="display:flex;gap:12px;justify-content:center;align-items:flex-end;margin-bottom:20px;min-height:140px"></div>
               <div class="card">
-                <div class="card-hdr"><div class="card-title">Ranking de Lojas</div><div style="font-size:11px;color:var(--t3)">100%=10pts · 80-99%=7pts · 60-79%=4pts · abaixo=1pt</div></div>
+                <div class="card-hdr"><div class="card-title">Ranking de Lojas</div><div style="font-size:11px;color:var(--t3)">Soma de todos os setores por loja</div></div>
                 <table><thead><tr><th>#</th><th>Loja</th><th>Pontos</th><th>Enviados</th><th>100%</th><th>Media %</th></tr></thead>
                 <tbody id="rank-lojas-tbody"><tr class="erow"><td colspan="6">Nenhum dado</td></tr></tbody></table>
               </div>

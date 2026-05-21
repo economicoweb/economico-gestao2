@@ -4141,8 +4141,10 @@ function renderRelNaoConformidade() {
 }
 
 function switchRankView(view, btn) {
-  document.getElementById('rank-view-op').style.display    = view === 'operadores' ? 'block' : 'none';
-  document.getElementById('rank-view-lojas').style.display = view === 'lojas'      ? 'block' : 'none';
+  document.getElementById('rank-view-op').style.display        = view === 'operadores' ? 'block' : 'none';
+  document.getElementById('rank-view-gerencia').style.display  = view === 'gerencia'   ? 'block' : 'none';
+  document.getElementById('rank-view-prevencao').style.display = view === 'prevencao'  ? 'block' : 'none';
+  document.getElementById('rank-view-lojas').style.display     = view === 'lojas'      ? 'block' : 'none';
   document.querySelectorAll('#rel-cl-ranking .tabs .tab').forEach(function(t){ t.classList.remove('on'); });
   if (btn) btn.classList.add('on');
 }
@@ -4182,40 +4184,59 @@ function renderRelRanking() {
 
   var MEDALS = ['🥇','🥈','🥉'];
 
-  // ── RANKING DE OPERADORES ──────────────────────────────────
-  var opMap = {};
-  res.forEach(function(r){
-    if (!opMap[r.operador]) opMap[r.operador]={env:0,comp:0,soma:0,pontos:0};
-    opMap[r.operador].env++;
-    if (r.pct===100) opMap[r.operador].comp++;
-    opMap[r.operador].soma   += r.pct;
-    opMap[r.operador].pontos += calcPontos(r.pct);
-  });
-  var opList = Object.keys(opMap).map(function(n){
-    var o=opMap[n];
-    return {nome:n, env:o.env, comp:o.comp, pontos:o.pontos, media:Math.round(o.soma/o.env)};
-  }).sort(function(a,b){ return b.pontos-a.pontos || b.media-a.media; });
+  var users = getUsers();
 
+  // Helper: agrega resultados de uma lista filtrada por nome do operador
+  function buildRankList(filteredRes) {
+    var map = {};
+    filteredRes.forEach(function(r){
+      if (!map[r.operador]) map[r.operador]={env:0,comp:0,soma:0,pontos:0};
+      map[r.operador].env++;
+      if (r.pct===100) map[r.operador].comp++;
+      map[r.operador].soma   += r.pct;
+      map[r.operador].pontos += calcPontos(r.pct);
+    });
+    return Object.keys(map).map(function(n){
+      var o=map[n];
+      return {nome:n, env:o.env, comp:o.comp, pontos:o.pontos, media:Math.round(o.soma/o.env)};
+    }).sort(function(a,b){ return b.pontos-a.pontos || b.media-a.media; });
+  }
+
+  function buildRankTable(tbodyId, list, emptyMsg) {
+    var tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = list.length ? list.map(function(o,i){
+      var st = o.media===100?'st-ok':o.media>=70?'st-warn':'st-err';
+      var rowStyle = i===0 ? ' style="background:#fffbe6"' : '';
+      return '<tr'+rowStyle+'>'
+        +'<td>'+(MEDALS[i]||i+1)+'</td>'
+        +'<td><strong>'+o.nome+'</strong></td>'
+        +'<td><strong style="color:var(--g)">'+o.pontos+'</strong></td>'
+        +'<td>'+o.env+'</td>'
+        +'<td><span class="st '+(o.comp===o.env?'st-ok':'st-warn')+'">'+o.comp+'/'+o.env+'</span></td>'
+        +'<td><span class="st '+st+'">'+o.media+'%</span></td>'
+        +'</tr>';
+    }).join('') : '<tr class="erow"><td colspan="6">'+(emptyMsg||'Nenhum dado')+'</td></tr>';
+  }
+
+  // ── RANKING DE OPERADORES (perfil operator) ─────────────────
+  var opList = buildRankList(res.filter(function(r){ return r.perfil === 'operator'; }));
   buildPodio('rank-podio', opList);
+  buildRankTable('rank-tbody', opList, 'Nenhum operador enviou no período');
 
-  var tbody = document.getElementById('rank-tbody');
-  tbody.innerHTML = opList.length ? opList.map(function(o,i){
-    var st = o.media===100?'st-ok':o.media>=70?'st-warn':'st-err';
-    return '<tr>'
-      +'<td>'+(MEDALS[i]||i+1)+'</td>'
-      +'<td><strong>'+o.nome+'</strong></td>'
-      +'<td><strong style="color:var(--g)">'+o.pontos+'</strong></td>'
-      +'<td>'+o.env+'</td>'
-      +'<td><span class="st '+(o.comp===o.env?'st-ok':'st-warn')+'">'+o.comp+'/'+o.env+'</span></td>'
-      +'<td><span class="st '+st+'">'+o.media+'%</span></td>'
-      +'</tr>';
-  }).join('') : '<tr class="erow"><td colspan="6">Nenhum dado</td></tr>';
+  // ── RANKING DE GERÊNCIA (perfil gerencia) ───────────────────
+  var gerList = buildRankList(res.filter(function(r){ return r.perfil === 'gerencia'; }));
+  buildPodio('rank-gerencia-podio', gerList);
+  buildRankTable('rank-gerencia-tbody', gerList, 'Nenhum membro de gerência enviou no período');
 
-  // ── RANKING DE LOJAS ──────────────────────────────────────
-  var users    = getUsers();
-  var lojaMap  = {};
+  // ── RANKING DE PREVENÇÃO (perfil prevencao) ─────────────────
+  var prevList = buildRankList(res.filter(function(r){ return r.perfil === 'prevencao'; }));
+  buildPodio('rank-prevencao-podio', prevList);
+  buildRankTable('rank-prevencao-tbody', prevList, 'Nenhum membro de prevenção enviou no período');
+
+  // ── RANKING DE LOJAS (soma de todos os setores) ─────────────
+  var lojaMap = {};
   res.forEach(function(r){
-    // Busca loja do operador no cadastro
     var u = users.find(function(u){ return u.nome === r.operador; });
     var loja = (u && u.loja && u.loja.trim()) ? u.loja.trim() : 'Sem loja';
     if (!lojaMap[loja]) lojaMap[loja]={env:0,comp:0,soma:0,pontos:0};
@@ -4230,20 +4251,7 @@ function renderRelRanking() {
   }).sort(function(a,b){ return b.pontos-a.pontos || b.media-a.media; });
 
   buildPodio('rank-lojas-podio', lojaList);
-
-  var lojasTbody = document.getElementById('rank-lojas-tbody');
-  lojasTbody.innerHTML = lojaList.length ? lojaList.map(function(o,i){
-    var st = o.media===100?'st-ok':o.media>=70?'st-warn':'st-err';
-    var rowStyle = i===0 ? ' style="background:#fffbe6"' : '';
-    return '<tr'+rowStyle+'>'
-      +'<td>'+(MEDALS[i]||i+1)+'</td>'
-      +'<td><strong>'+o.nome+'</strong></td>'
-      +'<td><strong style="color:var(--g)">'+o.pontos+'</strong></td>'
-      +'<td>'+o.env+'</td>'
-      +'<td><span class="st '+(o.comp===o.env?'st-ok':'st-warn')+'">'+o.comp+'/'+o.env+'</span></td>'
-      +'<td><span class="st '+st+'">'+o.media+'%</span></td>'
-      +'</tr>';
-  }).join('') : '<tr class="erow"><td colspan="6">Nenhum dado — cadastre a loja nos usuários</td></tr>';
+  buildRankTable('rank-lojas-tbody', lojaList, 'Nenhum dado — cadastre a loja nos usuários');
 }
 
 // Clona elemento substituindo <canvas> por <img> com o conteúdo desenhado
