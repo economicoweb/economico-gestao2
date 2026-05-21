@@ -3759,7 +3759,7 @@ function renderRelChecklist() {
     if(ctx) S.relCharts.evolDiaria=new Chart(ctx,{type:'bar',data:{labels:diasLabels,datasets:[{label:'Envios',data:diasData,backgroundColor:'#2d9e62',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{stepSize:1},suggestedMax:5}}}});
   }
 
-  // Ranking
+  // Ranking por setor na visão geral
   var opsMap={};
   resultados.forEach(function(r){
     if(!opsMap[r.operador]) opsMap[r.operador]={perfil:r.perfil,env:0,comp:0,soma:0,ultimo:''};
@@ -3767,12 +3767,23 @@ function renderRelChecklist() {
   });
   var rankList=Object.keys(opsMap).map(function(n){var o=opsMap[n];return{nome:n,perfil:o.perfil,env:o.env,comp:o.comp,media:Math.round(o.soma/o.env),ultimo:o.ultimo};}).sort(function(a,b){return b.media-a.media||b.comp-a.comp;});
   var medals=['🥇','🥈','🥉'];
-  document.getElementById('rel-ranking-tbody').innerHTML = rankList.length ? rankList.map(function(o,i){
-    var st=o.media===100?'st-ok':o.media>=70?'st-warn':'st-err';
-    return '<tr><td>'+(medals[i]||i+1)+'</td><td><strong>'+o.nome+'</strong></td><td>'+o.env+'</td>'
-      +'<td><span class="st '+(o.comp===o.env?'st-ok':'st-warn')+'">'+o.comp+'/'+o.env+'</span></td>'
-      +'<td><span class="st '+st+'">'+o.media+'%</span></td></tr>';
-  }).join('') : '<tr class="erow"><td colspan="5">Nenhum dado</td></tr>';
+
+  function miniRankRows(list) {
+    return list.length ? list.map(function(o,i){
+      var st=o.media===100?'st-ok':o.media>=70?'st-warn':'st-err';
+      return '<tr><td>'+(medals[i]||i+1)+'</td><td><strong>'+o.nome+'</strong></td><td>'+o.env+'</td>'
+        +'<td><span class="st '+(o.comp===o.env?'st-ok':'st-warn')+'">'+o.comp+'/'+o.env+'</span></td>'
+        +'<td><span class="st '+st+'">'+o.media+'%</span></td></tr>';
+    }).join('') : '<tr class="erow"><td colspan="5">Nenhum dado</td></tr>';
+  }
+
+  var opRank   = rankList.filter(function(o){ return o.perfil === 'operator'; });
+  var gerRank  = rankList.filter(function(o){ return o.perfil === 'gerencia'; });
+  var prevRank = rankList.filter(function(o){ return o.perfil === 'prevencao'; });
+
+  document.getElementById('rel-ranking-op-tbody').innerHTML   = miniRankRows(opRank);
+  document.getElementById('rel-ranking-ger-tbody').innerHTML  = miniRankRows(gerRank);
+  document.getElementById('rel-ranking-prev-tbody').innerHTML = miniRankRows(prevRank);
 
   // Problemáticos
   var clMap={};
@@ -4138,6 +4149,15 @@ function renderRelNaoConformidade() {
       +'<td><span class="st st-warn">'+med+'%</span></td>'
       +'<td><span class="st st-err">Atenção</span></td></tr>';
   }).join('') : '<tr class="erow"><td colspan="5">Nenhuma reincidência</td></tr>';
+}
+
+function switchGeralRank(view, btn) {
+  ['op','ger','prev'].forEach(function(v){
+    var el = document.getElementById('geral-rank-view-'+v);
+    if (el) el.style.display = v === view ? 'block' : 'none';
+  });
+  document.querySelectorAll('#rel-cl-geral .tabs .tab').forEach(function(t){ t.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
 }
 
 function switchRankView(view, btn) {

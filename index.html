@@ -462,9 +462,26 @@
             </div>
             <div class="g2" style="margin-bottom:14px">
               <div class="card">
-                <div class="card-hdr"><div class="card-title">Ranking de Operadores</div></div>
-                <table><thead><tr><th>#</th><th>Operador</th><th>Enviados</th><th>100%</th><th>Media</th></tr></thead>
-                <tbody id="rel-ranking-tbody"><tr class="erow"><td colspan="5">Nenhum dado</td></tr></tbody></table>
+                <div class="card-hdr" style="flex-direction:column;align-items:flex-start;gap:8px">
+                  <div class="card-title">Ranking por Setor</div>
+                  <div class="tabs" style="margin:0;font-size:12px">
+                    <div class="tab on" id="geral-rank-tab-op" onclick="switchGeralRank('op',this)">Operadores</div>
+                    <div class="tab" id="geral-rank-tab-ger" onclick="switchGeralRank('ger',this)">Gerência</div>
+                    <div class="tab" id="geral-rank-tab-prev" onclick="switchGeralRank('prev',this)">Prevenção</div>
+                  </div>
+                </div>
+                <div id="geral-rank-view-op">
+                  <table><thead><tr><th>#</th><th>Nome</th><th>Enviados</th><th>100%</th><th>Media</th></tr></thead>
+                  <tbody id="rel-ranking-op-tbody"><tr class="erow"><td colspan="5">Nenhum dado</td></tr></tbody></table>
+                </div>
+                <div id="geral-rank-view-ger" style="display:none">
+                  <table><thead><tr><th>#</th><th>Nome</th><th>Enviados</th><th>100%</th><th>Media</th></tr></thead>
+                  <tbody id="rel-ranking-ger-tbody"><tr class="erow"><td colspan="5">Nenhum dado</td></tr></tbody></table>
+                </div>
+                <div id="geral-rank-view-prev" style="display:none">
+                  <table><thead><tr><th>#</th><th>Nome</th><th>Enviados</th><th>100%</th><th>Media</th></tr></thead>
+                  <tbody id="rel-ranking-prev-tbody"><tr class="erow"><td colspan="5">Nenhum dado</td></tr></tbody></table>
+                </div>
               </div>
               <div class="card">
                 <div class="card-hdr"><div class="card-title">Checklists com Menor Conclusao</div></div>
@@ -474,7 +491,7 @@
             </div>
             <div class="card">
               <div class="card-hdr"><div class="card-title">Desempenho Completo da Equipe</div></div>
-              <table><thead><tr><th>Operador</th><th>Perfil</th><th>Enviados</th><th>100%</th><th>Media %</th><th>Ultimo Envio</th></tr></thead>
+              <table><thead><tr><th>Nome</th><th>Perfil</th><th>Enviados</th><th>100%</th><th>Media %</th><th>Ultimo Envio</th></tr></thead>
               <tbody id="rel-equipe-tbody"><tr class="erow"><td colspan="6">Nenhum checklist enviado ainda</td></tr></tbody></table>
             </div>
           </div>
