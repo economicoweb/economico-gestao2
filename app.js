@@ -6115,6 +6115,11 @@ function abrirDetalheInv(invId, tabInicial) {
   // Reset bipagens filter
   var filter = document.getElementById('inv-bip-filter');
   if (filter) { filter.innerHTML=''; filter.removeAttribute('data-built'); }
+  // Botões de ação: só visíveis quando aberto
+  var actEl=document.getElementById('inv-end-actions');
+  if(actEl) actEl.style.display=isAberto?'':'none';
+  var corrBtn=document.getElementById('bip-btn-correcao');
+  if(corrBtn) corrBtn.style.display=isAberto?'':'none';
   var tab = tabInicial || 'enderecos';
   var btn = tab === 'enderecos'
     ? document.querySelector('#inv-detalhe-tabs .tab')
@@ -6199,17 +6204,19 @@ function atribuirColetor(invId, endereco, selectEl) {
 // ── Import catálogo TXT ───────────────────────────────────────────
 function _renderImportCatStatus(invId, forceReload) {
   var wrap=document.getElementById('inv-cat-status'); if(!wrap) return;
+  var isAberto=_invAtivo&&_invAtivo.status==='aberto';
   if (forceReload) delete _catCache[invId];
   loadCatalogoByInv(invId,function(cat){
     var n=Object.keys(cat).length;
     if (n>0) {
+      var reenviarBtn=isAberto?'<button class="btn btn-s btn-sm" onclick="abrirImportCat()">↩ Reenviar arquivo</button>':'';
       wrap.innerHTML=
         '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
           '<span style="padding:4px 12px;background:#e8f5ee;border:1.5px solid #c8e6c9;border-radius:8px;font-size:12px;font-weight:700;color:#1a5c34">✓ Catálogo: '+n+' produtos importados</span>'+
-          '<button class="btn btn-s btn-sm" onclick="abrirImportCat()">↩ Reenviar arquivo</button>'+
+          reenviarBtn+
         '</div>';
     } else {
-      wrap.innerHTML='<button class="btn btn-s btn-sm" onclick="abrirImportCat()">📥 Importar Catálogo TXT</button>';
+      wrap.innerHTML=isAberto?'<button class="btn btn-s btn-sm" onclick="abrirImportCat()">📥 Importar Catálogo TXT</button>':'';
     }
   });
 }
@@ -8203,6 +8210,7 @@ function renderInvEnderecos() {
   var inv=_invAtivo, invId=inv.id, enderecos=inv.enderecos||[];
   var tbody=document.getElementById('inv-end-tbody'); if(!tbody) return;
   var isAdmin=S.role==='admin'||S.role==='gerencia'||S.role==='supervisor';
+  var isAberto=inv.status==='aberto';
   if (inv.modoFila) {
     var filaMap=inv.fila||{};
     tbody.innerHTML=enderecos.map(function(end){
@@ -8210,7 +8218,7 @@ function renderInvEnderecos() {
       var colTxt=slot?slot.nome:'<span style="color:var(--t3)">—</span>';
       var status=!slot?'sem-coletor':slot.concluido?'concluido':'aguardando';
       var safeEnd=end.replace(/'/g,"\\'");
-      var reabrirBtn=isAdmin&&slot&&slot.concluido?'<button class="btn btn-s btn-sm" onclick="reabrirEndereco(\''+invId+'\',\''+safeEnd+'\')" style="color:var(--r);border-color:var(--r)">↩ Reabrir</button>':'';
+      var reabrirBtn=isAberto&&isAdmin&&slot&&slot.concluido?'<button class="btn btn-s btn-sm" onclick="reabrirEndereco(\''+invId+'\',\''+safeEnd+'\')" style="color:var(--r);border-color:var(--r)">↩ Reabrir</button>':'';
       return '<tr>'+
         '<td><strong>'+end+'</strong></td>'+
         '<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#e8f4ff;color:#1a5c9c">FILA</span></td>'+
@@ -8231,14 +8239,14 @@ function renderInvEnderecos() {
       var allDone=cols.length&&cols.every(function(c){ return c.concluido; });
       var status=!cols.length?'sem-coletor':allDone?'concluido':'aguardando';
       var safeEnd=end.replace(/'/g,"\\'");
-      var reabrirBtn=isAdmin&&allDone?'<button class="btn btn-s btn-sm" onclick="reabrirEndereco(\''+invId+'\',\''+safeEnd+'\')" style="color:var(--r);border-color:var(--r)">↩ Reabrir</button>':'';
+      var reabrirBtn=isAberto&&isAdmin&&allDone?'<button class="btn btn-s btn-sm" onclick="reabrirEndereco(\''+invId+'\',\''+safeEnd+'\')" style="color:var(--r);border-color:var(--r)">↩ Reabrir</button>':'';
       return '<tr>'+
         '<td><strong>'+end+'</strong></td>'+
         '<td>'+mb+'</td>'+
         '<td id="inv-coltxt-'+end.replace(/[^a-z0-9]/gi,'_')+'" style="font-size:12px">'+colTxt+'</td>'+
         '<td id="inv-ec-'+end.replace(/[^a-z0-9]/gi,'_')+'">—</td>'+
         '<td id="inv-st-'+end.replace(/[^a-z0-9]/gi,'_')+'">'+(_sbMapEnd[status]||'')+'</td>'+
-        '<td>'+reabrirBtn+'<button class="btn btn-s btn-sm" onclick="abrirModalGerenciarEnd(\''+invId+'\',\''+safeEnd+'\')">Gerenciar</button></td>'+
+        '<td>'+reabrirBtn+(isAberto?'<button class="btn btn-s btn-sm" onclick="abrirModalGerenciarEnd(\''+invId+'\',\''+safeEnd+'\')">Gerenciar</button>':'')+'</td>'+
       '</tr>';
     }).join('');
   }
