@@ -6324,17 +6324,153 @@ function renderInvBipagens(filtroEnd) {
       tbody.innerHTML = filtrados.map(function(b){
         var prod = cat[b.ean]||{};
         var hora = b.ts ? new Date(b.ts.seconds*1000).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '--';
-        return '<tr>'+
-          '<td><span style="font-weight:700;color:var(--t3)">#'+b.seq+'</span></td>'+
+        var isCorr=b.modo==='correcao';
+        var qtyTxt=isCorr
+          ?'<span style="font-weight:700;color:'+(b.qty<0?'var(--r)':'var(--g)')+'">'+( b.qty>0?'+':'')+b.qty+'</span>'
+          :''+b.qty+(prod.un?' <small>'+prod.un+'</small>':'');
+        var seqTxt=isCorr
+          ?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#fff3e0;color:#e65100">CORR.</span>'
+          :'<span style="font-weight:700;color:var(--t3)">#'+b.seq+'</span>';
+        return '<tr style="'+(isCorr?'background:#fff8f4;':'')+'">'+
+          '<td>'+seqTxt+'</td>'+
           '<td style="font-family:monospace;font-size:12px">'+b.ean+'</td>'+
           '<td style="font-size:12px">'+(prod.desc||'—')+'</td>'+
-          '<td style="font-weight:700;text-align:center">'+b.qty+(prod.un?' <small>'+prod.un+'</small>':'')+'</td>'+
+          '<td style="font-weight:700;text-align:center">'+qtyTxt+'</td>'+
           '<td style="font-size:12px">'+(b.coletorNome||'—')+'</td>'+
-          '<td style="font-size:12px">'+b.endereco+' · '+hora+'</td>'+
+          '<td style="font-size:12px">'+(isCorr?'Correção':''+b.endereco)+' · '+hora+'</td>'+
         '</tr>';
       }).join('');
     });
   });
+}
+
+// ── Sub-tabs de Bipagens ──────────────────────────────────────────────────
+function switchBipSubTab(tab, btn) {
+  ['todos','correcao'].forEach(function(t){
+    var el=document.getElementById('inv-bip-sub-'+t);
+    var b=document.getElementById('bip-sub-btn-'+t);
+    if(el) el.style.display=t===tab?'':'none';
+    if(b){ b.style.borderBottomColor=t===tab?'var(--y)':'transparent'; b.style.color=t===tab?'var(--t)':'var(--t2)'; }
+  });
+  if(tab==='correcao') renderCorrecaoBipagem();
+}
+
+// ── Correção de Bipagem ───────────────────────────────────────────────────
+var _corrEanCache=null;
+
+function renderCorrecaoBipagem() {
+  var wrap=document.getElementById('inv-correcao-wrap'); if(!wrap) return;
+  _corrEanCache=null;
+  wrap.innerHTML=
+    '<div class="card" style="max-width:480px">'+
+      '<div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:800;margin-bottom:4px">Correção de Bipagem</div>'+
+      '<div style="font-size:13px;color:var(--t2);margin-bottom:18px">Busque um EAN e informe a correção (negativo para reduzir, positivo para adicionar).</div>'+
+      '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">EAN / Código de Barras</label>'+
+      '<div style="display:flex;gap:8px;margin-bottom:14px">'+
+        '<input id="corr-ean-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou bipe o EAN..." '+
+          'style="flex:1;padding:13px 14px;border:2px solid var(--gray2);border-radius:10px;font-size:15px;font-family:monospace;letter-spacing:1px" '+
+          'onkeydown="if(event.key===\'Enter\')buscarEanCorrecao()"/>'+
+        '<button onclick="buscarEanCorrecao()" style="padding:13px 16px;background:var(--t);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Buscar</button>'+
+      '</div>'+
+      '<div id="corr-produto-info" style="display:none;padding:12px 14px;background:#f5f5f5;border-radius:10px;margin-bottom:14px">'+
+        '<div id="corr-produto-nome" style="font-size:13px;font-weight:700;margin-bottom:4px"></div>'+
+        '<div style="display:flex;gap:16px;flex-wrap:wrap">'+
+          '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Total bipado</div>'+
+            '<div id="corr-total-atual" style="font-size:22px;font-weight:800"></div></div>'+
+          '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Registros</div>'+
+            '<div id="corr-total-regs" style="font-size:22px;font-weight:800;color:var(--t2)"></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div id="corr-form-wrap" style="display:none">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">Valor da Correção</label>'+
+        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">'+
+          '<input id="corr-valor-input" type="number" placeholder="Ex: -2 ou +5" '+
+            'style="width:140px;padding:13px 12px;border:2.5px solid var(--y);border-radius:10px;font-size:20px;font-weight:700;text-align:center;font-family:inherit" '+
+            'oninput="_atualizarPreviewCorrecao()" onkeydown="if(event.key===\'Enter\')aplicarCorrecaoBipagem()"/>'+
+          '<div style="font-size:14px;color:var(--t3)">=</div>'+
+          '<div id="corr-preview" style="font-size:24px;font-weight:800;color:var(--t)">—</div>'+
+        '</div>'+
+        '<div id="corr-preview-label" style="font-size:12px;color:var(--t2);margin-bottom:14px"></div>'+
+        '<button onclick="aplicarCorrecaoBipagem()" style="width:100%;padding:14px;background:var(--y);color:#111;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Aplicar Correção</button>'+
+      '</div>'+
+      '<div id="corr-msg" style="min-height:20px;font-size:13px;font-weight:600;margin-top:10px"></div>'+
+    '</div>';
+  setTimeout(function(){ var el=document.getElementById('corr-ean-input'); if(el) el.focus(); },100);
+}
+
+function buscarEanCorrecao() {
+  if (!_invAtivo) return;
+  var ei=document.getElementById('corr-ean-input'); if(!ei) return;
+  var ean=ei.value.trim();
+  if (!ean) return;
+  var msgEl=document.getElementById('corr-msg');
+  if(msgEl) msgEl.textContent='Buscando...';
+  db.collection('inv_bipagens').where('invId','==',_invAtivo.id).where('ean','==',ean).get().then(function(snap){
+    var bips=snap.docs.map(function(d){ return d.data(); });
+    var totalQty=bips.reduce(function(s,b){ return s+(b.qty||0); },0);
+    _corrEanCache={ean:ean, total:totalQty, regs:bips.length};
+    loadCatalogoByInv(_invAtivo.id, function(cat){
+      var p=cat[ean]||{};
+      var piEl=document.getElementById('corr-produto-info');
+      var pnEl=document.getElementById('corr-produto-nome');
+      var taEl=document.getElementById('corr-total-atual');
+      var trEl=document.getElementById('corr-total-regs');
+      var fwEl=document.getElementById('corr-form-wrap');
+      var viEl=document.getElementById('corr-valor-input');
+      if(pnEl) pnEl.innerHTML='<span style="font-family:monospace;font-size:11px;color:var(--t3)">'+ean+'</span>'+(p.desc?' &nbsp;·&nbsp; <strong>'+p.desc+'</strong>':'<em style="color:var(--t3)"> — não está no catálogo</em>')+(p.un?' <small style="color:var(--t3)">'+p.un+'</small>':'');
+      if(taEl) taEl.textContent=totalQty;
+      if(trEl) trEl.textContent=bips.length;
+      if(piEl) piEl.style.display='';
+      if(fwEl) fwEl.style.display='';
+      if(viEl){ viEl.value=''; viEl.focus(); }
+      var prEl=document.getElementById('corr-preview'); if(prEl) prEl.textContent='—';
+      var plEl=document.getElementById('corr-preview-label'); if(plEl) plEl.textContent='';
+      if(msgEl) msgEl.textContent='';
+    });
+  }).catch(function(e){ if(msgEl) msgEl.textContent='Erro: '+e.message; });
+}
+
+function _atualizarPreviewCorrecao() {
+  if (!_corrEanCache) return;
+  var vi=document.getElementById('corr-valor-input'); if(!vi) return;
+  var val=parseFloat(vi.value);
+  var prEl=document.getElementById('corr-preview');
+  var plEl=document.getElementById('corr-preview-label');
+  if(isNaN(val)){ if(prEl) prEl.textContent='—'; if(plEl) plEl.textContent=''; return; }
+  var final=_corrEanCache.total+val;
+  if(prEl){
+    prEl.textContent=final;
+    prEl.style.color=val<0?'var(--r)':val>0?'var(--g)':'var(--t)';
+  }
+  if(plEl) plEl.textContent='Total atual ('+_corrEanCache.total+') '+(val>=0?'+ '+val:val)+' = '+final+' peças';
+}
+
+function aplicarCorrecaoBipagem() {
+  if (!_invAtivo||!_corrEanCache) return;
+  var vi=document.getElementById('corr-valor-input'); if(!vi) return;
+  var val=parseFloat(vi.value);
+  if(isNaN(val)||val===0){ alert('Informe um valor de correção diferente de zero.'); return; }
+  var msgEl=document.getElementById('corr-msg');
+  if(msgEl){ msgEl.textContent='Salvando...'; msgEl.style.color='var(--t2)'; }
+  var coletorId=_getIdColetor()||S.currentUser&&S.currentUser.id||'sistema';
+  var coletorNome=_getNomeColetor()||S.currentUser&&S.currentUser.nome||coletorId;
+  var inv=_invAtivo;
+  db.collection('inv_bipagens').add({
+    invId:inv.id, loja:inv.loja||'', endereco:'_CORRECAO', ean:_corrEanCache.ean,
+    qty:val, rodada:0, modo:'correcao',
+    coletorId:coletorId, coletorNome:coletorNome,
+    ts:firebase.firestore.FieldValue.serverTimestamp(), seq:Date.now()
+  }).then(function(){
+    var final=_corrEanCache.total+val;
+    if(msgEl){ msgEl.textContent='✓ Correção aplicada! Novo total: '+final+' peças.'; msgEl.style.color='var(--g)'; }
+    _corrEanCache.total=final;
+    _corrEanCache.regs++;
+    var taEl=document.getElementById('corr-total-atual'); if(taEl) taEl.textContent=final;
+    var trEl=document.getElementById('corr-total-regs'); if(trEl) trEl.textContent=_corrEanCache.regs;
+    var vi2=document.getElementById('corr-valor-input'); if(vi2) vi2.value='';
+    var prEl=document.getElementById('corr-preview'); if(prEl){ prEl.textContent='—'; prEl.style.color='var(--t)'; }
+    var plEl=document.getElementById('corr-preview-label'); if(plEl) plEl.textContent='';
+  }).catch(function(e){ if(msgEl){ msgEl.textContent='Erro: '+e.message; msgEl.style.color='var(--r)'; } });
 }
 
 // ── Exportar TXT para ERP ─────────────────────────────────────────
