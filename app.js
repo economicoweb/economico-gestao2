@@ -6117,7 +6117,7 @@ function abrirDetalheInv(invId, tabInicial) {
   if (filter) { filter.innerHTML=''; filter.removeAttribute('data-built'); }
   // Botões de ação: só visíveis quando aberto
   var actEl=document.getElementById('inv-end-actions');
-  if(actEl) actEl.style.display=isAberto?'':'none';
+  if(actEl) actEl.style.display=isAberto?'flex':'none';
   var corrBtn=document.getElementById('bip-btn-correcao');
   if(corrBtn) corrBtn.style.display=isAberto?'':'none';
   var tab = tabInicial || 'enderecos';
