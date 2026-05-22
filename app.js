@@ -6376,15 +6376,31 @@ function renderInvBipagens(filtroEnd, filtroCol) {
   });
 }
 
-// ── Sub-tabs de Bipagens ──────────────────────────────────────────────────
-function switchBipSubTab(tab, btn) {
-  ['todos','correcao'].forEach(function(t){
-    var el=document.getElementById('inv-bip-sub-'+t);
-    var b=document.getElementById('bip-sub-btn-'+t);
-    if(el) el.style.display=t===tab?'':'none';
-    if(b){ b.style.borderBottomColor=t===tab?'var(--y)':'transparent'; b.style.color=t===tab?'var(--t)':'var(--t2)'; }
-  });
-  if(tab==='correcao') renderCorrecaoBipagem();
+// ── Alternância tabela / correção ─────────────────────────────────────────
+function toggleCorrecaoBipagem() {
+  var corrWrap=document.getElementById('inv-bip-sub-correcao');
+  var tabelaWrap=document.getElementById('inv-bip-tabela-wrap');
+  var btn=document.getElementById('bip-btn-correcao');
+  var corrAberta=corrWrap&&corrWrap.style.display!=='none';
+  if(corrAberta){
+    if(corrWrap) corrWrap.style.display='none';
+    if(tabelaWrap) tabelaWrap.style.display='';
+    if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
+  } else {
+    if(corrWrap) corrWrap.style.display='';
+    if(tabelaWrap) tabelaWrap.style.display='none';
+    if(btn){ btn.style.background='var(--y)'; btn.style.color='#111'; btn.style.borderColor='var(--y)'; }
+    renderCorrecaoBipagem();
+  }
+}
+
+function _fecharCorrecaoView() {
+  var corrWrap=document.getElementById('inv-bip-sub-correcao');
+  var tabelaWrap=document.getElementById('inv-bip-tabela-wrap');
+  var btn=document.getElementById('bip-btn-correcao');
+  if(corrWrap) corrWrap.style.display='none';
+  if(tabelaWrap) tabelaWrap.style.display='';
+  if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
 }
 
 // ── Correção de Bipagem ───────────────────────────────────────────────────
@@ -6494,14 +6510,15 @@ function aplicarCorrecaoBipagem() {
     ts:firebase.firestore.FieldValue.serverTimestamp(), seq:Date.now()
   }).then(function(){
     var final=_corrEanCache.total+val;
-    if(msgEl){ msgEl.textContent='✓ Correção aplicada! Novo total: '+final+' peças.'; msgEl.style.color='var(--g)'; }
-    _corrEanCache.total=final;
-    _corrEanCache.regs++;
-    var taEl=document.getElementById('corr-total-atual'); if(taEl) taEl.textContent=final;
-    var trEl=document.getElementById('corr-total-regs'); if(trEl) trEl.textContent=_corrEanCache.regs;
-    var vi2=document.getElementById('corr-valor-input'); if(vi2) vi2.value='';
-    var prEl=document.getElementById('corr-preview'); if(prEl){ prEl.textContent='—'; prEl.style.color='var(--t)'; }
-    var plEl=document.getElementById('corr-preview-label'); if(plEl) plEl.textContent='';
+    // Mostra confirmação brevemente, depois limpa tudo para novo EAN
+    if(msgEl){ msgEl.textContent='✓ Correção aplicada! EAN '+_corrEanCache.ean+' → total: '+final+' peças.'; msgEl.style.color='var(--g)'; }
+    _corrEanCache=null;
+    setTimeout(function(){
+      var piEl=document.getElementById('corr-produto-info'); if(piEl) piEl.style.display='none';
+      var fwEl=document.getElementById('corr-form-wrap'); if(fwEl) fwEl.style.display='none';
+      var eiEl=document.getElementById('corr-ean-input'); if(eiEl){ eiEl.value=''; eiEl.focus(); }
+      setTimeout(function(){ var m=document.getElementById('corr-msg'); if(m) m.textContent=''; },2000);
+    },1200);
   }).catch(function(e){ if(msgEl){ msgEl.textContent='Erro: '+e.message; msgEl.style.color='var(--r)'; } });
 }
 

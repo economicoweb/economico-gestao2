@@ -945,25 +945,22 @@
 
           <!-- Tab Bipagens -->
           <div id="inv-tab-bipagens" style="display:none;margin-top:14px">
-            <!-- Sub-tabs -->
-            <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--gray)">
-              <button id="bip-sub-btn-todos" onclick="switchBipSubTab('todos',this)" style="padding:7px 18px;font-size:13px;font-weight:700;font-family:inherit;border:none;border-bottom:2.5px solid var(--y);background:transparent;color:var(--t);cursor:pointer;margin-bottom:-2px">Todos</button>
-              <button id="bip-sub-btn-correcao" onclick="switchBipSubTab('correcao',this)" style="padding:7px 18px;font-size:13px;font-weight:700;font-family:inherit;border:none;border-bottom:2.5px solid transparent;background:transparent;color:var(--t2);cursor:pointer;margin-bottom:-2px">✏ Correção</button>
+            <!-- Filtros + botão Correção -->
+            <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:12px;font-weight:600;color:var(--t2)">Endereço:</label>
+              <select id="inv-bip-filter" onchange="renderInvBipagens(this.value||null,null)" style="padding:7px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit"></select>
+              <select id="inv-bip-col-filter" onchange="renderInvBipagens(document.getElementById('inv-bip-filter').value||null,this.value||null)" style="display:none;padding:7px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit"></select>
+              <button class="btn btn-s btn-sm" onclick="renderInvBipagens(null,null);document.getElementById('inv-bip-filter').value='';document.getElementById('inv-bip-col-filter').style.display='none';_fecharCorrecaoView()">Todos</button>
+              <button id="bip-btn-correcao" class="btn btn-s btn-sm" onclick="toggleCorrecaoBipagem()" style="margin-left:auto">✏ Correção</button>
             </div>
-            <!-- Sub-tab: Todos -->
-            <div id="inv-bip-sub-todos">
-              <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <label style="font-size:12px;font-weight:600;color:var(--t2)">Endereço:</label>
-                <select id="inv-bip-filter" onchange="renderInvBipagens(this.value||null,null)" style="padding:7px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit"></select>
-                <select id="inv-bip-col-filter" onchange="renderInvBipagens(document.getElementById('inv-bip-filter').value||null,this.value||null)" style="display:none;padding:7px 10px;border:1.5px solid var(--gray2);border-radius:8px;font-size:13px;font-family:inherit"></select>
-                <button class="btn btn-s btn-sm" onclick="renderInvBipagens(null,null);document.getElementById('inv-bip-filter').value='';document.getElementById('inv-bip-col-filter').style.display='none'">Todos</button>
-              </div>
+            <!-- Tabela -->
+            <div id="inv-bip-tabela-wrap">
               <div class="card">
                 <table><thead><tr><th>Seq</th><th>EAN</th><th>Descrição</th><th>Qtd</th><th>Coletor</th><th>End. / Hora</th></tr></thead>
                 <tbody id="inv-bip-tbody"></tbody></table>
               </div>
             </div>
-            <!-- Sub-tab: Correção -->
+            <!-- Formulário de Correção -->
             <div id="inv-bip-sub-correcao" style="display:none">
               <div id="inv-correcao-wrap"></div>
             </div>
