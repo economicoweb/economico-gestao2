@@ -7652,11 +7652,77 @@ function renderColeta() {
   _carregarUltimasBipagens(inv.id,end,rodada,modo);
 }
 
-// ── Override finalizarRodada — modoFila suporte ───────────────────────────
+// ── Override finalizarRodada — modal de confirmação com resumo ───────────
 function finalizarRodada() {
   if (!_invColetaAtual) return;
-  var info=_invColetaAtual,inv=info.inv,invId=inv.id,end=info.endereco,rodada=info.rodada||1;
-  if (!confirm('Finalizar sua contagem do endereço '+end+'? Não será possível bipar mais itens.')) return;
+  var info=_invColetaAtual, inv=info.inv, invId=inv.id, end=info.endereco, rodada=info.rodada||1, modo=info.modo||'colaboracao';
+  db.collection('inv_bipagens').where('invId','==',invId).where('endereco','==',end).get().then(function(snap){
+    var bips=snap.docs.map(function(d){ return d.data(); });
+    if(modo==='auditoria'&&rodada) bips=bips.filter(function(b){ return (b.rodada||1)===rodada; });
+    bips.sort(function(a,b){ return (a.seq||0)-(b.seq||0); });
+    _exibirModalFinalizar(bips);
+  }).catch(function(){ _exibirModalFinalizar([]); });
+}
+
+function _exibirModalFinalizar(bips) {
+  if (!_invColetaAtual) return;
+  var end=_invColetaAtual.endereco, rodada=_invColetaAtual.rodada||1;
+  var inv=_invColetaAtual.inv;
+  var cat=_catCache[inv.id]||{};
+  var totalPecas=bips.reduce(function(s,b){ return s+(b.qty||1); },0);
+  var rows=bips.map(function(b){
+    var p=cat[b.ean]||{};
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px;white-space:nowrap">'+b.ean+'</td>'+
+      '<td style="font-size:12px;color:var(--t2)">'+(p.desc||'<span style="color:var(--t3)">—</span>')+'</td>'+
+      '<td style="text-align:right;font-weight:700;font-size:13px">'+b.qty+(b.fator>1?'<span style="font-size:10px;color:var(--t3)"> ×'+b.fator+'</span>':'')+'</td>'+
+    '</tr>';
+  }).join('');
+  var html=
+    '<div id="modal-finalizar" onclick="if(event.target===this)fecharModalFinalizar()" '+
+      'style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center">'+
+      '<div style="background:#fff;border-radius:18px 18px 0 0;padding:24px 20px 28px;width:100%;max-width:520px;max-height:82vh;display:flex;flex-direction:column;box-sizing:border-box">'+
+        '<div style="font-family:\'Syne\',sans-serif;font-size:17px;font-weight:800;margin-bottom:2px">Finalizar Endereço</div>'+
+        '<div style="font-size:26px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--t);margin-bottom:4px">'+end+'</div>'+
+        (rodada>1?'<div style="font-size:12px;color:#5b21b6;font-weight:700;margin-bottom:8px">Rodada '+rodada+'</div>':'')+
+        '<div style="display:flex;gap:10px;margin-bottom:14px">'+
+          '<div style="flex:1;padding:12px 8px;background:#f5f5f5;border-radius:12px;text-align:center">'+
+            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t3)">Itens</div>'+
+            '<div style="font-size:26px;font-weight:800;line-height:1.1">'+bips.length+'</div>'+
+          '</div>'+
+          '<div style="flex:1;padding:12px 8px;background:#fff8e1;border-radius:12px;text-align:center">'+
+            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#b38600">Peças</div>'+
+            '<div style="font-size:26px;font-weight:800;line-height:1.1">'+totalPecas+'</div>'+
+          '</div>'+
+        '</div>'+
+        (rows
+          ?'<div style="overflow-y:auto;flex:1;margin-bottom:16px;border:1px solid var(--gray2);border-radius:10px">'+
+            '<table style="width:100%"><thead><tr>'+
+              '<th style="font-size:11px;position:sticky;top:0;background:#fafafa">EAN</th>'+
+              '<th style="font-size:11px;position:sticky;top:0;background:#fafafa">Descrição</th>'+
+              '<th style="font-size:11px;text-align:right;position:sticky;top:0;background:#fafafa">Qtd</th>'+
+            '</tr></thead><tbody>'+rows+'</tbody></table></div>'
+          :'<div style="color:var(--t3);font-size:13px;margin-bottom:16px;padding:14px;background:#f5f5f5;border-radius:10px;text-align:center">Nenhuma bipagem neste endereço ainda.</div>')+
+        '<div style="padding:10px 12px;background:#fdecea;border-radius:10px;margin-bottom:12px;font-size:12px;color:#c0392b;font-weight:600;text-align:center">'+
+          '⚠ Após finalizar não será mais possível bipar itens neste endereço.'+
+        '</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button onclick="fecharModalFinalizar()" style="flex:1;padding:14px;background:#fff;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2)">Cancelar</button>'+
+          '<button onclick="_confirmarFinalizarRodada()" style="flex:2;padding:14px;background:var(--r);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">✓ Confirmar Finalização</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function fecharModalFinalizar() {
+  var m=document.getElementById('modal-finalizar'); if(m) m.remove();
+}
+
+function _confirmarFinalizarRodada() {
+  fecharModalFinalizar();
+  if (!_invColetaAtual) return;
+  var info=_invColetaAtual, inv=info.inv, invId=inv.id, end=info.endereco, rodada=info.rodada||1;
   if (inv.modoFila) {
     var upd={}; upd['fila.'+end+'.concluido']=true; upd['fila.'+end+'.concluidoEm']=firebase.firestore.FieldValue.serverTimestamp();
     db.collection('inv_inventarios').doc(invId).update(upd).then(function(){
