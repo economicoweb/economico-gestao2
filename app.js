@@ -7911,7 +7911,7 @@ function renderColeta() {
       '</div>'
     :'<div style="margin-top:14px">'+
         '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">'+
-          '<button id="inv-pallet-btn" onclick="_toggleModoPallet()" title="Modo Pallet: multiplica Qtd × Fator" style="padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;border:1.5px solid '+(palletOn?'var(--y)':'var(--gray2)')+';background:'+(palletOn?'var(--y)':'#fff')+';color:'+(palletOn?'#111':'var(--t2)')+'">'+
+          '<button id="inv-pallet-btn" onclick="_toggleModoPallet()" title="Modo Pallet: multiplica Qtd × Qtd Emb" style="padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;border:1.5px solid '+(palletOn?'var(--y)':'var(--gray2)')+';background:'+(palletOn?'var(--y)':'#fff')+';color:'+(palletOn?'#111':'var(--t2)')+'">'+
             '🏗 Pallet '+(palletOn?'ON':'—')+
           '</button>'+
         '</div>'+
@@ -7924,7 +7924,7 @@ function renderColeta() {
           '<div style="width:80px"><label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">Qtd</label>'+
             '<input id="inv-qty-input" type="number" value="1" min="1" style="width:100%;padding:13px 10px;border:2px solid var(--gray2);border-radius:10px;font-size:16px;text-align:center;font-family:inherit" onkeydown="if(event.key===\'Enter\'){if(_getModoPallet()){var fi=document.getElementById(\'inv-fator-input\');if(fi){fi.focus();fi.select();}}else registrarBipagem();}"/></div>'+
           '<div id="inv-fator-wrap" style="width:62px;'+(palletOn?'':'display:none')+'">'+
-            '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">× Fator</label>'+
+            '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">Qtd Emb</label>'+
             '<input id="inv-fator-input" type="number" value="1" min="1" style="width:100%;padding:13px 8px;border:2px solid var(--gray2);border-radius:10px;font-size:16px;text-align:center;font-family:inherit" onkeydown="if(event.key===\'Enter\')registrarBipagem()"/></div>'+
           '<button onclick="registrarBipagem()" style="padding:13px 22px;background:#FFC600;color:#111;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Registrar</button>'+
         '</div>'+
