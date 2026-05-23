@@ -695,7 +695,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '110';
+    var _BUILD = '111';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -7770,6 +7770,54 @@ function pararQRScan() {
   if (_qrAnimFrame){ cancelAnimationFrame(_qrAnimFrame); _qrAnimFrame=null; }
   if (_qrStream){ _qrStream.getTracks().forEach(function(t){ t.stop(); }); _qrStream=null; }
   var wrap=document.getElementById('qr-scan-wrap'); if(wrap) wrap.style.display='none';
+}
+
+// ── Gerar QR codes dos endereços para impressão ───────────────────────────
+function gerarQREnderecos() {
+  if (!_invAtivo) return;
+  var inv = _invAtivo;
+  var enderecos = inv.enderecos || [];
+  if (!enderecos.length) { showToast('Nenhum endereço cadastrado.'); return; }
+  var logoEl = document.querySelector('.sb-logo img');
+  var logoSrc = logoEl ? logoEl.src : '';
+  var data = new Date().toLocaleDateString('pt-BR');
+  var cards = enderecos.map(function(end) {
+    var enc = encodeURIComponent(end);
+    return '<div class="qr-card">'
+      + '<img src="https://api.qrserver.com/v1/create-qr-code/?data='+enc+'&size=180x180&margin=6" width="180" height="180" alt="'+end+'"/>'
+      + '<div class="addr">'+end+'</div>'
+      + '<div class="inv-info">'+inv.loja+'</div>'
+      + '</div>';
+  }).join('');
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>QR Enderecos — '+inv.loja+'</title>'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + '@page{margin:12mm}'
+    + 'body{font-family:Arial,sans-serif;background:#fff;color:#111}'
+    + '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #FFC600;padding-bottom:12px;margin-bottom:24px}'
+    + '.header img{height:60px;object-fit:contain}'
+    + '.header-fb{font-size:20px;font-weight:800;color:#111}'
+    + '.header-info{text-align:right}'
+    + '.header-info h1{font-size:16px;font-weight:800;color:#111}'
+    + '.header-info p{font-size:11px;color:#666;margin-top:3px}'
+    + '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}'
+    + '.qr-card{border:2px solid #222;border-radius:10px;padding:18px 12px;text-align:center;page-break-inside:avoid}'
+    + '.qr-card img{display:block;margin:0 auto}'
+    + '.addr{font-size:17px;font-weight:800;margin-top:12px;font-family:monospace;letter-spacing:.5px;word-break:break-all}'
+    + '.inv-info{font-size:11px;color:#888;margin-top:4px}'
+    + '.instr{margin-top:28px;text-align:center;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px}'
+    + '</style></head><body>'
+    + '<div class="header">'
+    + (logoSrc ? '<img src="'+logoSrc+'" alt="Logo"/>' : '<div class="header-fb">FC360</div>')
+    + '<div class="header-info"><h1>QR dos Endereços — Inventário</h1><p>'+inv.loja+' &nbsp;|&nbsp; Gerado em '+data+'</p></div>'
+    + '</div>'
+    + '<div class="grid">'+cards+'</div>'
+    + '<div class="instr">Coloque cada etiqueta no endereço físico correspondente. O coletor escaneia com o app FC360 para selecionar o endereço automaticamente.</div>'
+    + '</body></html>';
+  var w = window.open('', '_blank', 'width=900,height=700');
+  if (w) { w.document.write(html); w.document.close(); w.onload = function(){ w.print(); }; }
+  else showToast('Permita pop-ups para gerar os QR codes.');
 }
 
 // ── Override _encontrarAtribuicao — suporte a modoFila ────────────────────

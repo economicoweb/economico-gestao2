@@ -906,6 +906,7 @@
             <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
               <div id="inv-cat-status"><button class="btn btn-s btn-sm" onclick="abrirImportCat()">📥 Importar Catálogo TXT</button></div>
               <input type="file" id="inv-import-file" accept=".txt,.csv" style="display:none" onchange="importarCatalogo(event)"/>
+              <button class="btn btn-s btn-sm" onclick="gerarQREnderecos()">🖨️ Imprimir QR dos Endereços</button>
             </div>
             <div class="card">
               <table><thead><tr><th>Endereço</th><th>Modo</th><th>Coletores</th><th>Bipagens</th><th>Status</th><th></th></tr></thead>
@@ -1593,7 +1594,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=110" defer></script>
+<script src="app.js?v=111" defer></script>
 
 
 </body>
