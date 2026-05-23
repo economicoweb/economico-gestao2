@@ -17,6 +17,62 @@ db.enablePersistence({synchronizeTabs: true}).catch(function(err){
   }
 });
 
+// ── Verificação de modo anônimo / privado ─────────────────────────────────
+(function(){
+  function _mostrarAvisoAnonimo(motivo) {
+    var el = document.createElement('div');
+    el.id = 'aviso-anonimo';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:24px';
+    el.innerHTML =
+      '<div style="background:#fff;border-radius:20px;padding:32px 28px;max-width:400px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">' +
+        '<div style="font-size:48px;margin-bottom:12px">🚫</div>' +
+        '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;color:#c0392b">Modo Privado Detectado</div>' +
+        '<div style="font-size:14px;color:#555;line-height:1.6;margin-bottom:20px">' +
+          'O app de inventário <strong>não funciona em aba anônima ou privada</strong>. ' +
+          'Neste modo o armazenamento local é bloqueado e as bipagens realizadas sem internet <strong>serão perdidas</strong>.' +
+          '<br><br><span style="font-size:12px;color:#888">Motivo técnico: ' + motivo + '</span>' +
+        '</div>' +
+        '<div style="background:#fff3e0;border-radius:10px;padding:14px;margin-bottom:20px;text-align:left">' +
+          '<div style="font-size:13px;font-weight:700;color:#e65100;margin-bottom:6px">Como resolver:</div>' +
+          '<div style="font-size:13px;color:#555;line-height:1.6">' +
+            '1. Feche esta aba<br>' +
+            '2. Abra uma aba normal (não privada)<br>' +
+            '3. Acesse o app novamente' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'aviso-anonimo\').remove()" ' +
+          'style="width:100%;padding:13px;background:#c0392b;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">' +
+          'Entendi — continuar mesmo assim (não recomendado)' +
+        '</button>' +
+      '</div>';
+    document.body.appendChild(el);
+  }
+
+  // Teste 1: localStorage
+  try {
+    localStorage.setItem('_fc360_chk', '1');
+    localStorage.removeItem('_fc360_chk');
+  } catch(e) {
+    setTimeout(function(){ _mostrarAvisoAnonimo('localStorage bloqueado'); }, 500);
+    return;
+  }
+
+  // Teste 2: IndexedDB (crítico — Firestore offline depende dele)
+  try {
+    var _testReq = indexedDB.open('_fc360_chk_' + Date.now(), 1);
+    _testReq.onerror = function() {
+      setTimeout(function(){ _mostrarAvisoAnonimo('IndexedDB bloqueado'); }, 500);
+    };
+    _testReq.onsuccess = function() {
+      var dbName = _testReq.result.name;
+      _testReq.result.close();
+      try { indexedDB.deleteDatabase(dbName); } catch(e){}
+    };
+  } catch(e) {
+    setTimeout(function(){ _mostrarAvisoAnonimo('IndexedDB não suportado'); }, 500);
+  }
+})();
+
 // ── PWA: registrar Service Worker ──
 var _swRefreshing = false;
 
@@ -695,7 +751,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '118';
+    var _BUILD = '119';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
