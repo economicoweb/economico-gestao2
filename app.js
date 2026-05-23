@@ -8263,85 +8263,99 @@ function _triggerDownload(blob, filename) {
   setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
 }
 
-// ── PDF de Bipagens por Endereço ───────────────────────────────────────────
+// ── PDF de Bipagens por Endereco ───────────────────────────────────────────
 function gerarPDFBipagens() {
-  if (!_invAtivo) return;
+  if (!_invAtivo) { alert('Nenhum inventario ativo.'); return; }
   var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-  if (!jsPDFCtor) { alert('PDF não carregou. Verifique sua conexão.'); return; }
+  if (!jsPDFCtor) { alert('PDF nao carregou. Verifique sua conexao.'); return; }
   var inv = _invAtivo;
   var now = new Date();
   var dtStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
 
   loadBipagensByInv(inv.id, function(bips) {
-    if (!bips.length) { alert('Nenhuma bipagem registrada neste inventário.'); return; }
+    if (!bips.length) { alert('Nenhuma bipagem registrada neste inventario.'); return; }
     loadCatalogoByInv(inv.id, function(cat) {
-      var doc = new jsPDFCtor({orientation:'portrait', unit:'mm', format:'a4'});
+      try {
+        var doc = new jsPDFCtor({orientation:'portrait', unit:'mm', format:'a4'});
 
-      doc.setFillColor(255, 198, 0);
-      doc.rect(0, 0, 210, 28, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(17, 17, 17);
-      doc.text('FC360 — Bipagens por Endereço', 14, 12);
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-      doc.text(inv.nome, 14, 19);
-      doc.text('Gerado: ' + dtStr + '  |  Total: ' + bips.length + ' bipagens', 14, 25);
+        doc.setFillColor(255, 198, 0);
+        doc.rect(0, 0, 210, 28, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(17, 17, 17);
+        doc.text('FC360 - Bipagens por Endereco', 14, 12);
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+        doc.text(inv.nome, 14, 19);
+        doc.text('Gerado: ' + dtStr + '  |  Total: ' + bips.length + ' bipagens', 14, 25);
 
-      // Agrupa por endereço → EAN → qty somada
-      var endMap = {};
-      bips.forEach(function(b) {
-        var end = b.endereco || '(sem endereço)';
-        if (!endMap[end]) endMap[end] = {setor:'', eans:{}, coletores:{}};
-        var slot = endMap[end];
-        if (b.setor && !slot.setor) slot.setor = b.setor;
-        var ean = b.ean || '—';
-        slot.eans[ean] = (slot.eans[ean] || 0) + (b.qty || 1);
-        if (b.coletorId) slot.coletores[b.coletorId] = b.coletorNome || b.coletorId;
-      });
-
-      var enderecos = Object.keys(endMap).sort();
-      var grandTotal = 0;
-
-      enderecos.forEach(function(end) {
-        var slot = endMap[end];
-        var setor = slot.setor;
-        var coletores = Object.keys(slot.coletores).map(function(id){ return slot.coletores[id]; }).join(', ') || '—';
-        var eanRows = Object.keys(slot.eans).sort().map(function(ean) {
-          var qty = slot.eans[ean];
-          var desc = (cat[ean] && cat[ean].desc) ? cat[ean].desc : '—';
-          return [ean, desc, qty];
+        // Agrupa por endereco -> EAN -> qty somada
+        var endMap = {};
+        bips.forEach(function(b) {
+          var end = b.endereco || '(sem endereco)';
+          if (!endMap[end]) endMap[end] = {setor:'', eans:{}, coletores:{}};
+          var slot = endMap[end];
+          if (b.setor && !slot.setor) slot.setor = b.setor;
+          var ean = b.ean || '-';
+          slot.eans[ean] = (slot.eans[ean] || 0) + (b.qty || 1);
+          if (b.coletorId) slot.coletores[b.coletorId] = b.coletorNome || b.coletorId;
         });
-        var sub = eanRows.reduce(function(s, r) { return s + r[2]; }, 0);
-        grandTotal += sub;
 
-        var headFill = setor === 'ESTOQUE' ? [232, 240, 255] : setor === 'LOJA' ? [255, 248, 225] : [240, 240, 240];
-        var headLabel = end + (setor ? '  [' + setor + ']' : '') + '\nColetores: ' + coletores;
+        var enderecos = Object.keys(endMap).sort();
+        var grandTotal = 0;
 
-        doc.autoTable({
-          startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 36,
-          head: [
-            [{content: headLabel, colSpan: 3, styles: {fillColor: headFill, textColor: [17,17,17], fontStyle: 'bold', fontSize: 9, halign: 'left', cellPadding: 3}}],
-            ['EAN', 'Descrição', 'Qtd']
-          ],
-          body: eanRows.concat([[' ', 'Subtotal', sub]]),
-          theme: 'striped',
-          headStyles: {fillColor: [210, 210, 210], textColor: [17,17,17], fontStyle: 'bold', fontSize: 8},
-          bodyStyles: {fontSize: 8},
-          columnStyles: {0:{cellWidth: 38, font: 'courier', fontSize: 7}, 2:{halign: 'center', cellWidth: 14}},
-          didParseCell: function(data) {
-            if (data.section === 'body' && data.row.index === eanRows.length) {
-              data.cell.styles.fillColor = [245, 245, 245];
-              data.cell.styles.fontStyle = 'bold';
-            }
-          },
-          margin: {left: 14, right: 14}
+        enderecos.forEach(function(end) {
+          var slot = endMap[end];
+          var setor = slot.setor;
+          var coletores = Object.keys(slot.coletores).map(function(id){ return slot.coletores[id]; }).join(', ') || '-';
+          var eanRows = Object.keys(slot.eans).sort().map(function(ean) {
+            var qty = slot.eans[ean];
+            var desc = (cat[ean] && cat[ean].desc) ? cat[ean].desc : '-';
+            return [ean, desc, qty];
+          });
+          var sub = eanRows.reduce(function(s, r) { return s + r[2]; }, 0);
+          grandTotal += sub;
+
+          // Cabecalho do endereco desenhado manualmente
+          var startY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 5 : 36;
+          if (startY > 262) { doc.addPage(); startY = 14; }
+
+          var bgR = 240, bgG = 240, bgB = 240;
+          if (setor === 'ESTOQUE') { bgR=232; bgG=240; bgB=255; }
+          else if (setor === 'LOJA') { bgR=255; bgG=248; bgB=225; }
+          doc.setFillColor(bgR, bgG, bgB);
+          doc.rect(14, startY, 182, 12, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(17, 17, 17);
+          doc.text(end + (setor ? ' [' + setor + ']' : ''), 17, startY + 5);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+          doc.text('Coletores: ' + coletores, 17, startY + 10);
+
+          // Tabela de EANs
+          var nDataRows = eanRows.length;
+          doc.autoTable({
+            startY: startY + 13,
+            head: [['EAN', 'Descricao', 'Qtd']],
+            body: eanRows.concat([['', 'Subtotal', sub]]),
+            theme: 'striped',
+            headStyles: {fillColor: [210, 210, 210], textColor: [17,17,17], fontStyle: 'bold', fontSize: 8},
+            bodyStyles: {fontSize: 8},
+            columnStyles: {0:{cellWidth: 38, font: 'courier', fontSize: 7}, 2:{halign: 'center', cellWidth: 14}},
+            didParseCell: function(data) {
+              if (data.section === 'body' && data.row.index === nDataRows) {
+                data.cell.styles.fillColor = [245, 245, 245];
+                data.cell.styles.fontStyle = 'bold';
+              }
+            },
+            margin: {left: 14, right: 14}
+          });
         });
-      });
 
-      var finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : 40;
-      if (finalY > 272) { doc.addPage(); finalY = 20; }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(17, 17, 17);
-      doc.text('TOTAL GERAL: ' + grandTotal + ' unidades  |  ' + enderecos.length + ' endereços', 14, finalY);
+        var finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : 40;
+        if (finalY > 272) { doc.addPage(); finalY = 20; }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(17, 17, 17);
+        doc.text('TOTAL GERAL: ' + grandTotal + ' unidades | ' + enderecos.length + ' enderecos', 14, finalY);
 
-      _baixarPDF(doc, (inv.nome||'inventario').replace(/[^a-z0-9]/gi,'_') + '_bipagens.pdf');
+        _baixarPDF(doc, (inv.nome||'inventario').replace(/[^a-z0-9]/gi,'_') + '_bipagens.pdf');
+      } catch(e) {
+        alert('Erro ao gerar PDF: ' + e.message);
+      }
     });
   });
 }
