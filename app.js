@@ -6299,8 +6299,47 @@ function importarCatalogo(event) {
 // ── Encerrar inventário ───────────────────────────────────────────
 function encerrarInventario(invId) {
   if (!invId) return;
-  if (!confirm('Encerrar este inventário? Coletores não poderão mais registrar bipagens.')) return;
-  db.collection('inv_inventarios').doc(invId).update({ status:'encerrado' }).then(function(){
+  var inv=(S.invsCache||[]).find(function(i){ return i.id===invId; });
+  var nomeInv=inv?inv.nome:'este inventário';
+  var html=
+    '<div id="modal-encerrar-inv" onclick="if(event.target===this)fecharModalEncerrarInv()" '+
+      'style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center;padding:0">'+
+      '<div style="background:#fff;border-radius:20px 20px 0 0;padding:28px 24px 36px;width:100%;max-width:480px;box-shadow:0 -4px 32px rgba(0,0,0,.18)">'+
+        '<div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;margin-bottom:6px;color:#c0392b">⚠ Encerrar Inventário</div>'+
+        '<div style="font-size:14px;color:var(--t2);margin-bottom:6px">Você está prestes a encerrar:</div>'+
+        '<div style="font-size:15px;font-weight:700;margin-bottom:14px;padding:10px 14px;background:#fdecea;border-radius:10px;color:#c0392b">'+nomeInv+'</div>'+
+        '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.5">'+
+          'Após encerrar, <strong>nenhum coletor poderá registrar novas bipagens</strong>. '+
+          'O inventário ficará disponível apenas para consulta no Histórico.'+
+        '</div>'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:8px">Confirme sua senha para continuar</label>'+
+        '<input id="encerrar-inv-senha" type="password" placeholder="Sua senha" autocomplete="current-password" '+
+          'style="width:100%;padding:13px;border:2px solid var(--r);border-radius:10px;font-size:15px;box-sizing:border-box;font-family:inherit;margin-bottom:6px" '+
+          'onkeydown="if(event.key===\'Enter\')_confirmarEncerrarInv(\''+invId+'\')"/>'+
+        '<div id="encerrar-inv-err" style="color:var(--r);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px"></div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button onclick="fecharModalEncerrarInv()" style="flex:1;padding:13px;background:#fff;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2)">Cancelar</button>'+
+          '<button onclick="_confirmarEncerrarInv(\''+invId+'\')" style="flex:2;padding:13px;background:var(--r);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Encerrar Inventário</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(function(){ var el=document.getElementById('encerrar-inv-senha'); if(el) el.focus(); }, 100);
+}
+
+function fecharModalEncerrarInv() {
+  var m=document.getElementById('modal-encerrar-inv'); if(m) m.remove();
+}
+
+function _confirmarEncerrarInv(invId) {
+  var senhaEl=document.getElementById('encerrar-inv-senha');
+  var errEl=document.getElementById('encerrar-inv-err');
+  var senha=(senhaEl?senhaEl.value:'').trim();
+  if (!senha) { if(errEl) errEl.textContent='Informe sua senha.'; return; }
+  var user=S.currentUser;
+  if (!user||senha!==user.senha) { if(errEl) errEl.textContent='Senha incorreta. Tente novamente.'; if(senhaEl){senhaEl.value='';senhaEl.focus();} return; }
+  fecharModalEncerrarInv();
+  db.collection('inv_inventarios').doc(invId).update({ status:'encerrado', encerradoEm:firebase.firestore.FieldValue.serverTimestamp(), encerradoPor:user.id }).then(function(){
     loadInventariosFromFirebase(function(){
       renderInvList();
       if (_invAtivo && _invAtivo.id===invId) {
