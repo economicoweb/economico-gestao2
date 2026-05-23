@@ -695,7 +695,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '117';
+    var _BUILD = '118';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -6348,33 +6348,50 @@ function encerrarInventario(invId) {
   if (!invId) return;
   var inv=(S.invsCache||[]).find(function(i){ return i.id===invId; });
   var nomeInv=inv?inv.nome:'este inventário';
-  var html=
-    '<div id="modal-encerrar-inv" onclick="if(event.target===this)fecharModalEncerrarInv()" '+
-      'style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">'+
-      '<div style="background:#fff;border-radius:16px;padding:28px 24px 24px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.22)">'+
-        '<div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;margin-bottom:6px;color:#c0392b">⚠ Encerrar Inventário</div>'+
-        '<div style="font-size:14px;color:var(--t2);margin-bottom:6px">Você está prestes a encerrar:</div>'+
-        '<div style="font-size:15px;font-weight:700;margin-bottom:14px;padding:10px 14px;background:#fdecea;border-radius:10px;color:#c0392b">'+nomeInv+'</div>'+
-        '<div style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.5">'+
-          'Após encerrar, <strong>nenhum coletor poderá registrar novas bipagens</strong>. '+
-          'O inventário ficará disponível apenas para consulta no Histórico.'+
+  var enderecos=inv?inv.enderecos||[]:[];
+  var filaMap=inv?(inv.fila||{}):{};
+  var safeId=invId.replace(/'/g,"\\'");
+  // Carrega bipagens para mostrar resumo
+  loadBipagensByInv(invId,function(bips){
+    var totalBips=bips.length;
+    var endsConcl=0,endsSemBip=0;
+    enderecos.forEach(function(e){
+      if(inv.modoFila){ if(filaMap[e]&&filaMap[e].concluido) endsConcl++; }
+      else { var at=_normalizeAtrib((inv.atribuicoes||{})[e]); if(at.coletores.length&&at.coletores.every(function(c){ return c.concluido; })) endsConcl++; }
+      if(!bips.some(function(b){ return b.endereco===e; })) endsSemBip++;
+    });
+    var alertaSemBip=endsSemBip>0?'<div style="background:#fff3e0;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#e65100;font-weight:600">⚠ '+endsSemBip+' endereço(s) sem nenhuma bipagem</div>':'';
+    var alertaIncompleto=endsConcl<enderecos.length?'<div style="background:#fdecea;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#c0392b;font-weight:600">⚠ '+(enderecos.length-endsConcl)+' endereço(s) ainda não concluídos</div>':'<div style="background:#d1f0e0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#1a5c34;font-weight:600">✓ Todos os endereços foram concluídos</div>';
+    var html=
+      '<div id="modal-encerrar-inv" onclick="if(event.target===this)fecharModalEncerrarInv()" '+
+        'style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto">'+
+        '<div style="background:#fff;border-radius:16px;padding:28px 24px 24px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.22)">'+
+          '<div style="font-family:\'Syne\',sans-serif;font-size:18px;font-weight:800;margin-bottom:6px;color:#c0392b">⚠ Encerrar Inventário</div>'+
+          '<div style="font-size:15px;font-weight:700;margin-bottom:14px;padding:10px 14px;background:#fdecea;border-radius:10px;color:#c0392b">'+nomeInv+'</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+            '<div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800">'+enderecos.length+'</div><div style="font-size:11px;color:var(--t3)">Endereços</div></div>'+
+            '<div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800">'+endsConcl+'</div><div style="font-size:11px;color:var(--t3)">Concluídos</div></div>'+
+            '<div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800">'+totalBips.toLocaleString('pt-BR')+'</div><div style="font-size:11px;color:var(--t3)">Total bipagens</div></div>'+
+            '<div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:'+(endsSemBip>0?'#c0392b':'#1a5c34')+'">'+endsSemBip+'</div><div style="font-size:11px;color:var(--t3)">Sem bipagem</div></div>'+
+          '</div>'+
+          alertaSemBip+alertaIncompleto+
+          '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:8px">Confirme sua senha para encerrar</label>'+
+          '<input type="text" style="display:none" aria-hidden="true"/>'+
+          '<input type="password" style="display:none" aria-hidden="true"/>'+
+          '<input id="encerrar-inv-senha" type="password" placeholder="Digite sua senha" autocomplete="new-password" readonly '+
+            'style="width:100%;padding:13px;border:2px solid var(--r);border-radius:10px;font-size:15px;box-sizing:border-box;font-family:inherit;margin-bottom:6px" '+
+            'onfocus="this.removeAttribute(\'readonly\')" '+
+            'onkeydown="if(event.key===\'Enter\')_confirmarEncerrarInv(\''+safeId+'\')"/>'+
+          '<div id="encerrar-inv-err" style="color:var(--r);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px"></div>'+
+          '<div style="display:flex;gap:10px">'+
+            '<button onclick="fecharModalEncerrarInv()" style="flex:1;padding:13px;background:#fff;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2)">Cancelar</button>'+
+            '<button onclick="_confirmarEncerrarInv(\''+safeId+'\')" style="flex:2;padding:13px;background:var(--r);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Encerrar</button>'+
+          '</div>'+
         '</div>'+
-        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:8px">Confirme sua senha para continuar</label>'+
-        '<input type="text" style="display:none" aria-hidden="true"/>'+
-        '<input type="password" style="display:none" aria-hidden="true"/>'+
-        '<input id="encerrar-inv-senha" type="password" placeholder="Digite sua senha" autocomplete="new-password" readonly '+
-          'style="width:100%;padding:13px;border:2px solid var(--r);border-radius:10px;font-size:15px;box-sizing:border-box;font-family:inherit;margin-bottom:6px" '+
-          'onfocus="this.removeAttribute(\'readonly\')" '+
-          'onkeydown="if(event.key===\'Enter\')_confirmarEncerrarInv(\''+invId+'\')"/>'+
-        '<div id="encerrar-inv-err" style="color:var(--r);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px"></div>'+
-        '<div style="display:flex;gap:10px">'+
-          '<button onclick="fecharModalEncerrarInv()" style="flex:1;padding:13px;background:#fff;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2)">Cancelar</button>'+
-          '<button onclick="_confirmarEncerrarInv(\''+invId+'\')" style="flex:2;padding:13px;background:var(--r);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Encerrar Inventário</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  document.body.insertAdjacentHTML('beforeend', html);
-  setTimeout(function(){ var el=document.getElementById('encerrar-inv-senha'); if(el){ el.value=''; el.focus(); } }, 120);
+      '</div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+    setTimeout(function(){ var el=document.getElementById('encerrar-inv-senha'); if(el){ el.value=''; el.focus(); } }, 120);
+  });
 }
 
 function fecharModalEncerrarInv() {
@@ -7341,7 +7358,9 @@ function abrirModalNovoInv() {
   var deEl=document.getElementById('ninv-end-de'); if(deEl) deEl.value='0';
   var ateEl=document.getElementById('ninv-end-ate'); if(ateEl) ateEl.value='';
   var cb = document.getElementById('ninv-modoFila');
-  if (cb) cb.checked = false;
+  if (cb) cb.checked = true;
+  var se = document.getElementById('ninv-setores'); if (se) se.value = 'ESTOQUE,LOJA';
+  var me = document.getElementById('ninv-meta'); if (me) me.value = '98';
   // Reset tipo para Geral
   var radioGeral = document.querySelector('input[name="ninv-tipo"][value="geral"]');
   if (radioGeral) { radioGeral.checked = true; _ninvTipoChange(); }
@@ -7384,6 +7403,11 @@ function criarInventario() {
   var cbEl = document.getElementById('ninv-modoFila');
   var modoFila = !!(cbEl && cbEl.checked);
   var tipo = (document.querySelector('input[name="ninv-tipo"]:checked')||{}).value||'geral';
+  var setoresRaw = (document.getElementById('ninv-setores')||{}).value||'ESTOQUE,LOJA';
+  var setores = setoresRaw.split(',').map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s.length>0; });
+  if (!setores.length) setores = ['ESTOQUE','LOJA'];
+  var metaEl = document.getElementById('ninv-meta');
+  var meta = metaEl ? (parseInt(metaEl.value)||0) : 0;
   var errEl = document.getElementById('ninv-err');
   if (errEl) errEl.style.display = 'none';
   if (!nome) { if(errEl){errEl.textContent='Informe o nome do inventário.';errEl.style.display='block';} return; }
@@ -7397,7 +7421,9 @@ function criarInventario() {
     criadoPor: S.currentUser ? S.currentUser.id : '',
     enderecos: enderecos, atribuicoes: {},
     modoFila: modoFila, fila: {},
-    totalBipagens: 0
+    totalBipagens: 0,
+    setores: setores,
+    meta: meta || 0
   }).then(function(){
     fecharModalInv();
     loadInventariosFromFirebase(function(){ renderInvList(); });
@@ -7696,14 +7722,25 @@ function _mostrarSetorPicker(invId, endereco) {
       '<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;box-shadow:0 -4px 32px rgba(0,0,0,.18)">'+
         '<div style="font-family:\'Syne\',sans-serif;font-size:17px;font-weight:800;margin-bottom:4px">Selecionar Setor</div>'+
         '<div style="font-size:13px;color:var(--t3);margin-bottom:20px">Endereço: <strong style="font-family:monospace">'+endereco+'</strong></div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
-          '<button onclick="_confirmarSetorFila(\''+safeInvId+'\',\''+safeEnd+'\',\'ESTOQUE\')" style="padding:20px 12px;border:2.5px solid #3b5bdb;border-radius:14px;background:#e8f0ff;color:#1a3c9c;font-size:17px;font-weight:800;font-family:\'Syne\',sans-serif;cursor:pointer">📦<br>ESTOQUE</button>'+
-          '<button onclick="_confirmarSetorFila(\''+safeInvId+'\',\''+safeEnd+'\',\'LOJA\')" style="padding:20px 12px;border:2.5px solid #b38600;border-radius:14px;background:#fff8e1;color:#b38600;font-size:17px;font-weight:800;font-family:\'Syne\',sans-serif;cursor:pointer">🏪<br>LOJA</button>'+
-        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:14px" id="setor-picker-btns"></div>'+
         '<button onclick="_fecharSetorPicker()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;color:var(--t2)">Cancelar</button>'+
       '</div>'+
     '</div>';
   document.body.insertAdjacentHTML('beforeend', html);
+  // Popula botões de setor dinamicamente
+  var inv=(S.invsCache||[]).find(function(i){ return i.id===invId; });
+  var setores=(inv&&inv.setores&&inv.setores.length)?inv.setores:['ESTOQUE','LOJA'];
+  var _setorColors=['#3b5bdb|#e8f0ff|#1a3c9c','#b38600|#fff8e1|#b38600','#1a7a4a|#e8f5ee|#1a5c34','#c0392b|#fdecea|#c0392b','#5b21b6|#ede9fe|#5b21b6','#666|#f0f0f0|#333'];
+  var _setorIcons={'ESTOQUE':'📦','LOJA':'🏪','DEPOSITO':'🏭','FREEZER':'❄','FARMACIA':'💊','ACOUGUE':'🥩','PADARIA':'🍞','HORTIFRUTI':'🥦','BEBIDAS':'🍺'};
+  var btnsEl=document.getElementById('setor-picker-btns');
+  if(btnsEl){
+    btnsEl.innerHTML=setores.map(function(s,i){
+      var c=(_setorColors[i%_setorColors.length]).split('|');
+      var icon=_setorIcons[s]||'📁';
+      var ss=s.replace(/'/g,"\\'");
+      return '<button onclick="_confirmarSetorFila(\''+safeInvId+'\',\''+safeEnd+'\',\''+ss+'\')" style="padding:18px 10px;border:2.5px solid '+c[0]+';border-radius:14px;background:'+c[1]+';color:'+c[2]+';font-size:15px;font-weight:800;font-family:\'Syne\',sans-serif;cursor:pointer">'+icon+'<br>'+s+'</button>';
+    }).join('');
+  }
 }
 
 function _fecharSetorPicker() {
@@ -8039,7 +8076,8 @@ function renderColeta() {
             '<input id="inv-fator-input" type="number" value="1" min="1" style="width:100%;padding:13px 8px;border:2px solid var(--gray2);border-radius:10px;font-size:16px;text-align:center;font-family:inherit" onkeydown="if(event.key===\'Enter\')registrarBipagem()"/></div>'+
           '<button onclick="registrarBipagem()" style="padding:13px 22px;background:#FFC600;color:#111;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Registrar</button>'+
         '</div>'+
-        '<div style="margin-top:12px;display:flex;justify-content:flex-end">'+
+        '<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">'+
+          '<button onclick="_abrirSemEAN()" style="padding:8px 14px;background:#fff;border:1.5px solid var(--gray2);color:var(--t2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📝 Sem código</button>'+
           '<button onclick="finalizarRodada()" style="padding:8px 18px;background:#fff;border:1.5px solid var(--r);color:var(--r);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Finalizar Contagem</button>'+
         '</div>'+
       '</div>';
@@ -8294,6 +8332,21 @@ function renderDashboardRealtime(bips) {
     'resolvido':'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#d1f0e0;color:#1a5c34">✓ Resolvido</span>',
     'divergente':'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fdecea;color:#c0392b">⚠ Divergente</span>'
   };
+  // Alerta 100% concluído
+  if (endsConcl===enderecos.length&&enderecos.length>0&&inv.status==='aberto'&&!_inv100pctAlerted[invId]) {
+    _inv100pctAlerted[invId]=true;
+    _alertar100pct();
+  }
+  // Meta de acurácia
+  if (inv.meta&&inv.meta>0) {
+    var pct=enderecos.length>0?Math.round((endsConcl/enderecos.length)*100):0;
+    var metaEl2=document.getElementById('dash-inv-meta');
+    if(metaEl2) metaEl2.innerHTML='<span style="font-weight:700;color:'+(pct>=inv.meta?'#1a5c34':'#c0392b')+'">'+pct+'%</span><span style="color:var(--t3);font-size:11px;margin-left:4px">/ meta '+inv.meta+'%</span>';
+  }
+  // Timeout por endereço: última bipagem por endereço
+  var agora=Date.now(), TIMEOUT_MS=15*60*1000;
+  var ultimaBipEnd={};
+  bips.forEach(function(b){ var t=b.ts&&b.ts.seconds?b.ts.seconds*1000:0; if(t>(ultimaBipEnd[b.endereco]||0)) ultimaBipEnd[b.endereco]=t; });
   var tbody=document.getElementById('dash-inv-tbody'); if(!tbody) return;
   tbody.innerHTML=rows.map(function(r){
     var mb=r.modo==='auditoria'
@@ -8303,7 +8356,12 @@ function renderDashboardRealtime(bips) {
     var divCell=r.divs.length
       ?'<button class="btn btn-s btn-sm" onclick="verDivergencias(\''+r.end+'\')">'+r.divs.length+' itens</button>'+(r.resSel?'<span style="font-size:11px;font-weight:700;color:var(--g);margin-left:4px">R'+r.resSel.rodada+'✓</span>':'')
       :'—';
-    return '<tr><td><strong>'+r.end+'</strong></td><td>'+mb+'</td><td style="font-size:12px;color:var(--t2)">'+r.colTxt+'</td><td style="text-align:center;font-weight:700">'+r.total+'</td><td>'+(sbMap[r.status]||r.status)+'</td><td>'+divCell+'</td></tr>';
+    var timeoutWarn='';
+    if (r.status==='em-andamento'&&ultimaBipEnd[r.end]&&(agora-ultimaBipEnd[r.end])>TIMEOUT_MS) {
+      var mins=Math.floor((agora-ultimaBipEnd[r.end])/60000);
+      timeoutWarn='<span title="Sem bipagem há '+mins+' min" style="display:inline-block;padding:1px 6px;border-radius:8px;background:#fdecea;color:#c0392b;font-size:10px;font-weight:700;margin-left:4px">⚠ '+mins+'min</span>';
+    }
+    return '<tr><td><strong>'+r.end+'</strong>'+timeoutWarn+'</td><td>'+mb+'</td><td style="font-size:12px;color:var(--t2)">'+r.colTxt+'</td><td style="text-align:center;font-weight:700">'+r.total+'</td><td>'+(sbMap[r.status]||r.status)+'</td><td>'+divCell+'</td></tr>';
   }).join('');
 }
 
@@ -8845,7 +8903,11 @@ function registrarBipagem() {
   _bipRegistrando=true;
   var _bipData={invId:inv.id,loja:inv.loja||'',endereco:end,seq:seq,ean:ean,qty:qtyTotal,rodada:rodada,modo:modo,setor:(_filaEndAtual&&_filaEndAtual.setor)||'',coletorId:coletorId,coletorNome:_getNomeColetor()||coletorId,ts:firebase.firestore.FieldValue.serverTimestamp()};
   if(fator>1) _bipData.fator=fator;
+  _offlinePending++;
+  if(window._atualizarOfflineBanner) window._atualizarOfflineBanner();
   db.collection('inv_bipagens').add(_bipData).then(function(){
+    _offlinePending=Math.max(0,_offlinePending-1);
+    if(window._atualizarOfflineBanner) window._atualizarOfflineBanner();
     db.collection('inv_inventarios').doc(inv.id).update({totalBipagens:firebase.firestore.FieldValue.increment(1)}).catch(function(){});
     _nextSeq++;
     var sl=document.getElementById('inv-seq-label'); if(sl) sl.textContent='Próx. seq: '+_nextSeq;
@@ -8854,7 +8916,7 @@ function registrarBipagem() {
     ei.focus();
     _carregarUltimasBipagens(inv.id,end,rodada,modo);
     _bipRegistrando=false;
-  }).catch(function(e){ _bipRegistrando=false; alert('Erro: '+e.message); });
+  }).catch(function(e){ _offlinePending=Math.max(0,_offlinePending-1); if(window._atualizarOfflineBanner) window._atualizarOfflineBanner(); _bipRegistrando=false; alert('Erro: '+e.message); });
 }
 
 // ── Feature 2: Itens não coletados ───────────────────────────────────────
@@ -9100,6 +9162,127 @@ function _exportarAvulsaCsv() {
     a.click(); setTimeout(function(){ URL.revokeObjectURL(url); },2000);
   }).catch(function(e){ alert('Erro: '+e.message); });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOVAS FEATURES — Inventário
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Variáveis globais das novas features ─────────────────────────────────
+var _inv100pctAlerted = {};   // { invId: true } — evita repetir o alerta
+var _offlinePending   = 0;    // bipagens aguardando sync
+
+// ── Feature: Indicador de offline ────────────────────────────────────────
+(function(){
+  function _atualizarOfflineBanner(){
+    var online=navigator.onLine;
+    var el=document.getElementById('offline-banner');
+    if(!el){
+      el=document.createElement('div');
+      el.id='offline-banner';
+      el.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:10px 16px;font-size:13px;font-weight:700;text-align:center;transition:transform .3s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px';
+      document.body.appendChild(el);
+    }
+    if(!online){
+      el.style.background='#c0392b'; el.style.color='#fff';
+      el.style.transform='translateY(0)';
+      var p=_offlinePending>0?' · '+_offlinePending+' bipagem(ns) aguardando envio':'';
+      el.textContent='📡 Sem internet'+p+' — seus dados estão salvos localmente';
+    } else if(_offlinePending>0){
+      el.style.background='#b38600'; el.style.color='#fff';
+      el.style.transform='translateY(0)';
+      el.textContent='⏳ Sincronizando '+_offlinePending+' bipagem(ns)...';
+    } else {
+      el.style.transform='translateY(100%)';
+    }
+  }
+  window.addEventListener('online',  _atualizarOfflineBanner);
+  window.addEventListener('offline', _atualizarOfflineBanner);
+  _atualizarOfflineBanner();
+  window._atualizarOfflineBanner=_atualizarOfflineBanner;
+})();
+
+// ── Feature: Alerta 100% concluído ───────────────────────────────────────
+function _alertar100pct(){
+  // Som via AudioContext (sem asset externo)
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator(); var g=ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.type='sine'; osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.15);
+    osc.frequency.setValueAtTime(880,ctx.currentTime+0.3);
+    g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.5);
+  }catch(e){}
+  // Toast visual
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a5c34;color:#fff;padding:16px 28px;border-radius:16px;font-weight:800;font-size:16px;font-family:\'Syne\',sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.25);text-align:center;animation:none';
+  t.innerHTML='🎉 Inventário 100% concluído!<br><span style="font-size:12px;font-weight:400">Todos os endereços foram finalizados.</span>';
+  document.body.appendChild(t);
+  setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },6000);
+}
+
+// ── Feature: Produto sem código de barras ─────────────────────────────────
+function _abrirSemEAN(){
+  if(!_invColetaAtual||_invColetaAtual.concluido) return;
+  var html=
+    '<div id="modal-sem-ean" onclick="if(event.target===this)_fecharSemEAN()" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2200;display:flex;align-items:flex-end;justify-content:center;padding:0">'+
+      '<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;box-shadow:0 -4px 32px rgba(0,0,0,.18)">'+
+        '<div style="font-family:\'Syne\',sans-serif;font-size:17px;font-weight:800;margin-bottom:4px">📝 Produto Sem Código</div>'+
+        '<div style="font-size:13px;color:var(--t3);margin-bottom:16px">Item sem etiqueta ou código de barras.</div>'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">Descrição do produto</label>'+
+        '<input id="sem-ean-desc" type="text" placeholder="Ex: Suco laranja caixa 1L" autocomplete="off" style="width:100%;padding:12px 14px;border:2px solid var(--gray2);border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')document.getElementById(\'sem-ean-qty\').focus()"/>'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--t2);display:block;margin-bottom:6px">Quantidade</label>'+
+        '<input id="sem-ean-qty" type="number" value="1" min="1" style="width:100%;padding:12px 14px;border:2px solid var(--gray2);border-radius:10px;font-size:16px;font-weight:700;text-align:center;font-family:monospace;margin-bottom:16px;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')_confirmarSemEAN()"/>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button onclick="_fecharSemEAN()" style="flex:1;padding:13px;background:#fff;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2)">Cancelar</button>'+
+          '<button onclick="_confirmarSemEAN()" style="flex:2;padding:13px;background:var(--y);color:#111;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✓ Registrar</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  setTimeout(function(){ var e=document.getElementById('sem-ean-desc'); if(e) e.focus(); },100);
+}
+
+function _fecharSemEAN(){
+  var m=document.getElementById('modal-sem-ean'); if(m) m.remove();
+}
+
+function _confirmarSemEAN(){
+  var descEl=document.getElementById('sem-ean-desc');
+  var qtyEl=document.getElementById('sem-ean-qty');
+  var desc=(descEl?descEl.value.trim():'');
+  var qty=parseInt(qtyEl?qtyEl.value:1)||1;
+  if(!desc){ if(descEl){ descEl.style.borderColor='var(--r)'; descEl.focus(); } return; }
+  _fecharSemEAN();
+  if(!_invColetaAtual) return;
+  var info=_invColetaAtual, inv=info.inv;
+  var coletorId=_getIdColetor();
+  var ean='SEM-EAN-'+Date.now();
+  var bipData={
+    invId:inv.id, loja:inv.loja||'', endereco:info.endereco,
+    seq:_nextSeq, ean:ean, desc:desc, qty:qty, rodada:info.rodada||1,
+    modo:info.modo||'colaboracao', setor:(_filaEndAtual&&_filaEndAtual.setor)||'',
+    coletorId:coletorId, coletorNome:_getNomeColetor()||coletorId,
+    semEAN:true, ts:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  _offlinePending++;
+  if(window._atualizarOfflineBanner) window._atualizarOfflineBanner();
+  db.collection('inv_bipagens').add(bipData).then(function(){
+    _offlinePending=Math.max(0,_offlinePending-1);
+    if(window._atualizarOfflineBanner) window._atualizarOfflineBanner();
+    db.collection('inv_inventarios').doc(inv.id).update({totalBipagens:firebase.firestore.FieldValue.increment(1)}).catch(function(){});
+    _nextSeq++;
+    showToast('📝 "'+desc+'" × '+qty+' registrado.');
+    _carregarUltimasBipagens(inv.id,info.endereco,info.rodada||1,info.modo||'colaboracao');
+    var ei=document.getElementById('inv-ean-input'); if(ei) ei.focus();
+  }).catch(function(e){
+    _offlinePending=Math.max(0,_offlinePending-1);
+    if(window._atualizarOfflineBanner) window._atualizarOfflineBanner();
+    alert('Erro: '+e.message);
+  });
+}
+
 
 // Restaura sessao ao recarregar a pagina
 // (script e defer — DOM ja esta pronto aqui, sem precisar de DOMContentLoaded)
