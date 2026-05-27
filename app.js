@@ -751,7 +751,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '125';
+    var _BUILD = '126';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -3406,7 +3406,126 @@ function _dashEquipeTab(perfil, btn) {
   _dashEquipePerfilAtivo = perfil;
   document.querySelectorAll('#dash-equipe-tabs .tab').forEach(function(t){ t.classList.remove('on'); });
   if (btn) btn.classList.add('on');
+  _renderDashKPIs(perfil);
   _renderDashEquipe();
+}
+
+function _renderDashKPIs(perfilFiltro) {
+  var resTodos  = window._dashEquipeResultadosHoje  || [];
+  var resOntem  = window._dashEquipeResultadosOntem || [];
+  var pf        = perfilFiltro || 'todos';
+  var resFilt   = pf === 'todos' ? resTodos : resTodos.filter(function(r){ return r.perfil === pf; });
+  var resOFilt  = pf === 'todos' ? resOntem : resOntem.filter(function(r){ return r.perfil === pf; });
+
+  var totalEnvios = resFilt.length;
+  var completos   = resFilt.filter(function(r){ return r.pct===100; }).length;
+  var mediaGeral  = totalEnvios ? Math.round(resFilt.reduce(function(s,r){ return s+r.pct; },0)/totalEnvios) : 0;
+
+  // KPI Checklists Hoje
+  var dckVal = document.getElementById('dck-val');
+  var dckBar = document.getElementById('dck-bar');
+  var dckPct = document.getElementById('dck-pct');
+  if (dckVal) dckVal.textContent = completos+'/'+totalEnvios+' envios';
+  if (dckBar) dckBar.style.width = mediaGeral+'%';
+  if (dckPct) dckPct.textContent = totalEnvios ? mediaGeral+'% média hoje' : 'Nenhum envio hoje';
+
+  // KPI Conformidade
+  var dconfEl    = document.getElementById('dconf-val');
+  var dconfSubEl = document.getElementById('dconf-sub');
+  if (dconfEl) {
+    dconfEl.textContent = totalEnvios ? mediaGeral+'%' : '—';
+    dconfEl.style.color = mediaGeral>=80 ? 'var(--g)' : mediaGeral>=60 ? 'var(--am)' : totalEnvios ? 'var(--r)' : 'var(--t3)';
+  }
+  if (dconfSubEl) dconfSubEl.textContent = '100% completos: '+completos;
+
+  // Trend vs ontem
+  var mediOntem  = resOFilt.length ? Math.round(resOFilt.reduce(function(s,r){ return s+r.pct; },0)/resOFilt.length) : null;
+  var trendCkEl  = document.getElementById('dck-trend');
+  var trendCfEl  = document.getElementById('dconf-trend');
+  if (mediOntem !== null) {
+    var diff     = mediaGeral - mediOntem;
+    var trendTxt = (diff>=0?'↑':'↓')+' '+Math.abs(diff)+'% vs ontem';
+    var trendCor = diff>=0 ? 'var(--g)' : 'var(--r)';
+    if (trendCkEl) { trendCkEl.textContent=trendTxt; trendCkEl.style.color=trendCor; }
+    if (trendCfEl) { trendCfEl.textContent=trendTxt; trendCfEl.style.color=trendCor; }
+  } else {
+    if (trendCkEl) trendCkEl.textContent='';
+    if (trendCfEl) trendCfEl.textContent='';
+  }
+
+  // KPI Operadores Ativos
+  var opsAtivos = [];
+  resFilt.forEach(function(r){ if(opsAtivos.indexOf(r.operador)<0) opsAtivos.push(r.operador); });
+  var dopsEl    = document.getElementById('dops-val');
+  var dopsSubEl = document.getElementById('dops-sub');
+  if (dopsEl)    dopsEl.textContent    = opsAtivos.length;
+  if (dopsSubEl) dopsSubEl.textContent = opsAtivos.length===1 ? 'operador enviou hoje' : 'operadores enviaram hoje';
+
+  // Card Operadores Ativos Hoje
+  var opsHojeWrap  = document.getElementById('dash-ops-hoje');
+  var opsHojeCount = document.getElementById('dash-ops-hoje-count');
+  if (opsHojeWrap) {
+    if (!resFilt.length) {
+      opsHojeWrap.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:13px;padding:24px">Nenhum envio hoje</div>';
+      if (opsHojeCount) opsHojeCount.textContent = '';
+    } else {
+      var opMap = {};
+      resFilt.forEach(function(r){
+        if (!opMap[r.operador]) opMap[r.operador] = {nome:r.operador, loja:r.loja||'', envios:0, totalPct:0};
+        opMap[r.operador].envios++;
+        opMap[r.operador].totalPct += (r.pct||0);
+      });
+      var opList = Object.values(opMap).sort(function(a,b){ return (b.totalPct/b.envios)-(a.totalPct/a.envios); });
+      if (opsHojeCount) opsHojeCount.textContent = opList.length+' ativo'+(opList.length>1?'s':'');
+      opsHojeWrap.innerHTML = opList.map(function(op){
+        var med = Math.round(op.totalPct/op.envios);
+        var cor = med===100?'var(--g2)':med>=80?'#2d9e62':med>=60?'var(--am)':'var(--r)';
+        var bg  = med===100?'var(--g3)':med>=60?'var(--am2)':'var(--r2)';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:'+bg+';border:1.5px solid '+cor+'">'
+          +'<div style="width:9px;height:9px;border-radius:50%;background:'+cor+';flex-shrink:0"></div>'
+          +'<div style="flex:1;min-width:0">'
+          +  '<div style="font-size:12px;font-weight:700;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+op.nome+'</div>'
+          +  (op.loja?'<div style="font-size:10px;color:var(--t3)">'+op.loja+'</div>':'')
+          +'</div>'
+          +'<div style="text-align:right;flex-shrink:0">'
+          +  '<div style="font-size:16px;font-weight:800;color:'+cor+';line-height:1">'+med+'%</div>'
+          +  '<div style="font-size:10px;color:var(--t3)">'+op.envios+' envio'+(op.envios>1?'s':'')+'</div>'
+          +'</div></div>';
+      }).join('');
+    }
+  }
+
+  // Indicador de saúde
+  var saudeDot   = document.getElementById('dash-saude-dot');
+  var saudeLabel = document.getElementById('dash-saude-label');
+  var saudeEl    = document.getElementById('dash-saude');
+  if (saudeDot && saudeLabel) {
+    if (!totalEnvios) {
+      saudeDot.style.background='#9ca3af'; saudeLabel.textContent='Aguardando envios'; saudeLabel.style.color='var(--t3)';
+      if (saudeEl) saudeEl.style.borderColor='var(--gray2)';
+    } else if (mediaGeral>=80) {
+      saudeDot.style.background='var(--g2)'; saudeLabel.textContent='Operação normal'; saudeLabel.style.color='var(--g)';
+      if (saudeEl) saudeEl.style.borderColor='var(--g2)';
+    } else if (mediaGeral>=60) {
+      saudeDot.style.background='var(--am)'; saudeLabel.textContent='Atenção necessária'; saudeLabel.style.color='var(--am)';
+      if (saudeEl) saudeEl.style.borderColor='var(--am)';
+    } else {
+      saudeDot.style.background='var(--r)'; saudeLabel.textContent='Conformidade crítica'; saudeLabel.style.color='var(--r)';
+      if (saudeEl) saudeEl.style.borderColor='var(--r)';
+    }
+  }
+
+  // KPI Pendentes
+  var pendVal = document.getElementById('dpend-val');
+  var pendSub = document.getElementById('dpend-sub');
+  if (pendVal) {
+    var todasPend = getPendencias();
+    var pendFilt  = pf === 'todos' ? todasPend : todasPend.filter(function(p){ return (p.cl.perfil||'').toLowerCase()===pf; });
+    var pendentes = pendFilt.length;
+    pendVal.textContent = pendentes;
+    pendVal.style.color = pendentes===0 ? 'var(--g)' : 'var(--r)';
+    if (pendSub) pendSub.textContent = pendentes===0 ? 'todos enviados ✓' : 'checklists em aberto';
+  }
 }
 
 function _renderDashEquipe() {
@@ -3471,104 +3590,9 @@ function updateDash() {
   if (dataFullEl) dataFullEl.textContent = dataFull.charAt(0).toUpperCase()+dataFull.slice(1);
 
   if (isAdmOrGer) {
-    var totalEnvios = resultadosHoje.length;
-    var completos = resultadosHoje.filter(function(r){return r.pct===100;}).length;
-    var mediaGeral = totalEnvios ? Math.round(resultadosHoje.reduce(function(s,r){return s+r.pct;},0)/totalEnvios) : 0;
-
-    // KPI: Checklists Hoje
-    document.getElementById('dck-val').textContent = completos+'/'+totalEnvios+' envios';
-    document.getElementById('dck-bar').style.width = mediaGeral+'%';
-    document.getElementById('dck-pct').textContent = totalEnvios ? mediaGeral+'% média hoje' : 'Nenhum envio hoje';
-
-    // KPI: Conformidade
-    var dconfEl = document.getElementById('dconf-val');
-    var dconfSubEl = document.getElementById('dconf-sub');
-    if (dconfEl) {
-      dconfEl.textContent = totalEnvios ? mediaGeral+'%' : '—';
-      dconfEl.style.color = mediaGeral>=80 ? 'var(--g)' : mediaGeral>=60 ? 'var(--am)' : totalEnvios ? 'var(--r)' : 'var(--t3)';
-    }
-    if (dconfSubEl) dconfSubEl.textContent = '100% completos: '+completos;
-
-    // Trends (vs ontem)
-    var mediOntem = resultadosOntem.length ? Math.round(resultadosOntem.reduce(function(s,r){return s+r.pct;},0)/resultadosOntem.length) : null;
-    var trendCkEl = document.getElementById('dck-trend');
-    var trendConfEl = document.getElementById('dconf-trend');
-    if (mediOntem !== null) {
-      var diff = mediaGeral - mediOntem;
-      var trendTxt = (diff>=0?'↑':'↓')+' '+Math.abs(diff)+'% vs ontem';
-      var trendCor = diff>=0 ? 'var(--g)' : 'var(--r)';
-      if (trendCkEl) { trendCkEl.textContent=trendTxt; trendCkEl.style.color=trendCor; }
-      if (trendConfEl) { trendConfEl.textContent=trendTxt; trendConfEl.style.color=trendCor; }
-    } else {
-      if (trendCkEl) trendCkEl.textContent='';
-      if (trendConfEl) trendConfEl.textContent='';
-    }
-
-    // KPI: Operadores ativos
-    var opsAtivos = [];
-    resultadosHoje.forEach(function(r){ if(opsAtivos.indexOf(r.operador)<0) opsAtivos.push(r.operador); });
-    var dopsEl = document.getElementById('dops-val');
-    var dopsSubEl = document.getElementById('dops-sub');
-    if (dopsEl) dopsEl.textContent = opsAtivos.length;
-    if (dopsSubEl) dopsSubEl.textContent = opsAtivos.length===1 ? 'operador enviou hoje' : 'operadores enviaram hoje';
-
-    // Card: Operadores Ativos Hoje
-    var opsHojeWrap = document.getElementById('dash-ops-hoje');
-    var opsHojeCount = document.getElementById('dash-ops-hoje-count');
-    if (opsHojeWrap) {
-      if (!resultadosHoje.length) {
-        opsHojeWrap.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:13px;padding:24px">Nenhum envio hoje</div>';
-        if (opsHojeCount) opsHojeCount.textContent = '';
-      } else {
-        var opMap = {};
-        resultadosHoje.forEach(function(r) {
-          if (!opMap[r.operador]) opMap[r.operador] = { nome: r.operador, loja: r.loja||'', envios: 0, totalPct: 0 };
-          opMap[r.operador].envios++;
-          opMap[r.operador].totalPct += (r.pct || 0);
-        });
-        var opList = Object.values(opMap).sort(function(a,b){ return (b.totalPct/b.envios) - (a.totalPct/a.envios); });
-        if (opsHojeCount) opsHojeCount.textContent = opList.length + ' ativo' + (opList.length > 1 ? 's' : '');
-        opsHojeWrap.innerHTML = opList.map(function(op) {
-          var media = Math.round(op.totalPct / op.envios);
-          var cor = media === 100 ? 'var(--g2)' : media >= 80 ? '#2d9e62' : media >= 60 ? 'var(--am)' : 'var(--r)';
-          var bg  = media === 100 ? 'var(--g3)' : media >= 60 ? 'var(--am2)' : 'var(--r2)';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:'+bg+';border:1.5px solid '+cor+'">'
-            + '<div style="width:9px;height:9px;border-radius:50%;background:'+cor+';flex-shrink:0"></div>'
-            + '<div style="flex:1;min-width:0">'
-            +   '<div style="font-size:12px;font-weight:700;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+op.nome+'</div>'
-            +   (op.loja ? '<div style="font-size:10px;color:var(--t3)">'+op.loja+'</div>' : '')
-            + '</div>'
-            + '<div style="text-align:right;flex-shrink:0">'
-            +   '<div style="font-size:16px;font-weight:800;color:'+cor+';line-height:1">'+media+'%</div>'
-            +   '<div style="font-size:10px;color:var(--t3)">'+op.envios+' envio'+(op.envios>1?'s':'')+'</div>'
-            + '</div>'
-            + '</div>';
-        }).join('');
-      }
-    }
-
-    // Indicador de saúde
-    var saudeDot = document.getElementById('dash-saude-dot');
-    var saudeLabel = document.getElementById('dash-saude-label');
-    var saudeEl = document.getElementById('dash-saude');
-    if (saudeDot && saudeLabel) {
-      if (!totalEnvios) {
-        saudeDot.style.background='#9ca3af'; saudeLabel.textContent='Aguardando envios'; saudeLabel.style.color='var(--t3)';
-        if (saudeEl) saudeEl.style.borderColor='var(--gray2)';
-      } else if (mediaGeral>=80) {
-        saudeDot.style.background='var(--g2)'; saudeLabel.textContent='Operação normal'; saudeLabel.style.color='var(--g)';
-        if (saudeEl) saudeEl.style.borderColor='var(--g2)';
-      } else if (mediaGeral>=60) {
-        saudeDot.style.background='var(--am)'; saudeLabel.textContent='Atenção necessária'; saudeLabel.style.color='var(--am)';
-        if (saudeEl) saudeEl.style.borderColor='var(--am)';
-      } else {
-        saudeDot.style.background='var(--r)'; saudeLabel.textContent='Conformidade crítica'; saudeLabel.style.color='var(--r)';
-        if (saudeEl) saudeEl.style.borderColor='var(--r)';
-      }
-    }
-
-    // Status da equipe
-    window._dashEquipeResultadosHoje = resultadosHoje;
+    window._dashEquipeResultadosHoje  = resultadosHoje;
+    window._dashEquipeResultadosOntem = resultadosOntem;
+    _renderDashKPIs(_dashEquipePerfilAtivo);
     _renderDashEquipe();
 
     // Atualizar gráfico de perdas com dados reais
@@ -3610,19 +3634,6 @@ function updateDash() {
       });
       S.dashCharts.setor.data.datasets[0].data = setorData;
       S.dashCharts.setor.update();
-    }
-
-    // KPI Pendentes Hoje
-    var pendVal = document.getElementById('dpend-val');
-    var pendSub = document.getElementById('dpend-sub');
-    if (pendVal) {
-      var totalCLs = getCustomCLs().length;
-      var enviadosHoje = resultadosHoje.map(function(r){return r.checklistId;});
-      var pendentes = totalCLs - enviadosHoje.length;
-      if (pendentes < 0) pendentes = 0;
-      pendVal.textContent = pendentes;
-      pendVal.style.color = pendentes === 0 ? 'var(--g)' : 'var(--r)';
-      if (pendSub) pendSub.textContent = pendentes === 0 ? 'todos enviados ✓' : 'checklists em aberto';
     }
 
     // Card Planos de Ação Abertos
@@ -4716,40 +4727,49 @@ function exportarRelatorioSupervisor() {
   hojeExtenso = hojeExtenso.charAt(0).toUpperCase()+hojeExtenso.slice(1);
   var loja = (S.currentUser && S.currentUser.loja) ? S.currentUser.loja : 'Fluxo Certo 360';
 
-  var resultados = getResultados();
-  var resultadosHoje = resultados.filter(function(r){ return r.dataHora && r.dataHora.indexOf(hojeStr)===0; });
-  var totalEnvios = resultadosHoje.length;
-  var completos = resultadosHoje.filter(function(r){return r.pct===100;}).length;
-  var media = totalEnvios ? Math.round(resultadosHoje.reduce(function(s,r){return s+r.pct;},0)/totalEnvios) : 0;
+  // Usa o mesmo filtro de perfil ativo no dashboard
+  var pf = _dashEquipePerfilAtivo || 'todos';
+  var perfilLabels = {todos:'Toda a Equipe', operator:'Operadores', gerencia:'Gerência', supervisor:'Supervisão', prevencao:'Prevenção'};
+  var perfilLabel  = perfilLabels[pf] || pf;
 
-  // Auxiliares de prevenção que enviaram hoje
-  var prevencaoHoje = resultadosHoje.filter(function(r){return r.perfil==='prevencao';});
+  var resultadosHoje = window._dashEquipeResultadosHoje || [];
+  if (!resultadosHoje.length) {
+    var resultados = getResultados();
+    resultadosHoje = resultados.filter(function(r){ return r.dataHora && r.dataHora.indexOf(hojeStr)===0; });
+  }
+  var resFilt   = pf==='todos' ? resultadosHoje : resultadosHoje.filter(function(r){ return r.perfil===pf; });
+  var totalEnvios = resFilt.length;
+  var completos   = resFilt.filter(function(r){ return r.pct===100; }).length;
+  var media       = totalEnvios ? Math.round(resFilt.reduce(function(s,r){ return s+r.pct; },0)/totalEnvios) : 0;
+
+  // Usuários do perfil selecionado
+  var todosUsers = getUsers().filter(function(u){ return u.id!=='admin' && u.ativo; });
+  var users = pf==='todos' ? todosUsers : todosUsers.filter(function(u){ return u.perfil===pf; });
   var opsUnicos = [];
-  prevencaoHoje.forEach(function(r){ if(opsUnicos.indexOf(r.operador)<0) opsUnicos.push(r.operador); });
-
-  // Todos os usuários de prevenção
-  var users = getUsers().filter(function(u){return u.perfil==='prevencao' && u.ativo;});
+  resFilt.forEach(function(r){ if(opsUnicos.indexOf(r.operador)<0) opsUnicos.push(r.operador); });
 
   // Perdas do dia
-  var totalPerdas = S.perdaItems.reduce(function(s,i){return s+i.total;},0);
+  var totalPerdas = S.perdaItems.reduce(function(s,i){ return s+i.total; },0);
 
-  // ── Seção: Status da equipe de prevenção ──
+  // ── Seção: Status da equipe ──
   var equipeTbody = users.length ? users.map(function(u){
-    var urs = prevencaoHoje.filter(function(r){return r.operador===u.nome;});
+    var urs   = resFilt.filter(function(r){ return r.operador===u.nome; });
     var enviou = urs.length>0;
-    var mediU = enviou ? Math.round(urs.reduce(function(s,r){return s+r.pct;},0)/urs.length) : null;
-    var cor = !enviou?'#e74c3c':mediU===100?'#2d9e62':mediU>=80?'#27ae60':mediU>=60?'#d68910':'#e74c3c';
+    var mediU  = enviou ? Math.round(urs.reduce(function(s,r){ return s+r.pct; },0)/urs.length) : null;
+    var cor    = !enviou?'#e74c3c':mediU===100?'#2d9e62':mediU>=80?'#27ae60':mediU>=60?'#d68910':'#e74c3c';
     var status = !enviou?'Pendente':mediU===100?'Concluído 100%':mediU+'% concluído';
+    var perfisLabel = {gerencia:'Gerência',operator:'Operador',prevencao:'Prevenção',supervisor:'Supervisão'};
     return '<tr>'
       +'<td>'+u.nome+'</td>'
+      +'<td>'+(perfisLabel[u.perfil]||u.perfil)+'</td>'
       +'<td>'+(u.loja||loja)+'</td>'
-      +'<td>'+urs.length+' envio'+(urs.length>1?'s':'')+'</td>'
+      +'<td>'+urs.length+' envio'+(urs.length!==1?'s':'')+'</td>'
       +'<td style="font-weight:700;color:'+cor+'">'+status+'</td>'
       +'</tr>';
-  }).join('') : '<tr><td colspan="4" style="text-align:center;color:#999">Nenhum auxiliar cadastrado</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:#999">Nenhum usuário nesta categoria</td></tr>';
 
-  // ── Seção: Checklists de prevenção enviados ──
-  var checkTbody = prevencaoHoje.length ? prevencaoHoje.slice().reverse().map(function(r){
+  // ── Seção: Checklists enviados ──
+  var checkTbody = resFilt.length ? resFilt.slice().reverse().map(function(r){
     var cor = r.pct===100?'#2d9e62':r.pct>=60?'#d68910':'#e74c3c';
     return '<tr>'
       +'<td>'+r.dataHora.split(' ')[1]+'</td>'
@@ -4758,6 +4778,19 @@ function exportarRelatorioSupervisor() {
       +'<td style="font-weight:700;color:'+cor+'">'+r.pct+'%</td>'
       +'</tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;color:#999">Nenhum checklist enviado hoje</td></tr>';
+
+  // ── Seção: Pendentes ──
+  var todasPend = getPendencias();
+  var pendFilt  = pf==='todos' ? todasPend : todasPend.filter(function(p){ return (p.cl.perfil||'').toLowerCase()===pf; });
+  var pendTbody = pendFilt.length ? pendFilt.map(function(p){
+    var cor = p.atrasado ? '#e74c3c' : '#d68910';
+    return '<tr>'
+      +'<td>'+p.cl.nome+'</td>'
+      +'<td>'+p.cl.setor+'</td>'
+      +'<td>'+p.horaLimite+'</td>'
+      +'<td style="font-weight:700;color:'+cor+'">'+(p.atrasado?'⚠ ATRASADO':'Pendente')+'</td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:#2d9e62">✅ Todos os checklists enviados</td></tr>';
 
   // ── Seção: Perdas do dia ──
   var perdasTbody = S.perdaItems.length ? S.perdaItems.slice().reverse().map(function(p){
@@ -4805,28 +4838,33 @@ function exportarRelatorioSupervisor() {
     +'<div class="header">'
     +(logoSrc?'<img src="'+logoSrc+'" alt="Logo"/>':'<div style="font-size:18px;font-weight:800">Fluxo Certo 360</div>')
     +'<div class="header-r">'
-    +'<h1>Relatório Diário — Prevenção de Perdas</h1>'
+    +'<h1>Relatório Diário — '+perfilLabel+'</h1>'
     +'<p>'+hojeExtenso+'</p>'
-    +'<p>Loja: <strong>'+loja+'</strong> &nbsp;|&nbsp; Status: <span class="status-pill">'+statusTxt+'</span></p>'
+    +'<p>Loja: <strong>'+loja+'</strong> &nbsp;|&nbsp; Gerado: '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' &nbsp;|&nbsp; Status: <span class="status-pill">'+statusTxt+'</span></p>'
     +'</div></div>'
 
     // KPIs
     +'<div class="kpis">'
     +'<div class="kpi"><div class="k-lbl">Checklists Enviados</div><div class="k-val">'+totalEnvios+'</div><div class="k-sub">'+completos+' com 100%</div></div>'
-    +'<div class="kpi"><div class="k-lbl">Conformidade Geral</div><div class="k-val" style="color:'+statusCor+'">'+media+'%</div><div class="k-sub">média do dia</div></div>'
-    +'<div class="kpi"><div class="k-lbl">Aux. Prevenção Ativos</div><div class="k-val">'+opsUnicos.length+'</div><div class="k-sub">de '+users.length+' cadastrados</div></div>'
-    +'<div class="kpi"><div class="k-lbl">Total de Perdas</div><div class="k-val" style="color:#e74c3c">R$ '+totalPerdas.toFixed(2)+'</div><div class="k-sub">'+S.perdaItems.length+' registros</div></div>'
+    +'<div class="kpi"><div class="k-lbl">Conformidade</div><div class="k-val" style="color:'+statusCor+'">'+media+'%</div><div class="k-sub">média do dia</div></div>'
+    +'<div class="kpi"><div class="k-lbl">Ativos Hoje</div><div class="k-val">'+opsUnicos.length+'</div><div class="k-sub">de '+users.length+' cadastrados</div></div>'
+    +'<div class="kpi"><div class="k-lbl">Pendentes</div><div class="k-val" style="color:'+(pendFilt.length?'#e74c3c':'#2d9e62')+'">'+pendFilt.length+'</div><div class="k-sub">'+(pendFilt.length?'checklists em aberto':'todos enviados ✓')+'</div></div>'
     +'</div>'
 
     // Status da equipe
-    +'<div class="section"><div class="section-title">Status da Equipe de Prevenção</div>'
-    +'<table><thead><tr><th>Auxiliar</th><th>Loja</th><th>Envios</th><th>Status</th></tr></thead>'
+    +'<div class="section"><div class="section-title">Status da Equipe — '+perfilLabel+'</div>'
+    +'<table><thead><tr><th>Nome</th><th>Perfil</th><th>Loja</th><th>Envios</th><th>Status</th></tr></thead>'
     +'<tbody>'+equipeTbody+'</tbody></table></div>'
 
-    // Checklists executados
-    +'<div class="section"><div class="section-title">Checklists Executados — Prevenção</div>'
-    +'<table><thead><tr><th>Hora</th><th>Auxiliar</th><th>Checklist</th><th>Conclusão</th></tr></thead>'
+    // Checklists enviados
+    +'<div class="section"><div class="section-title">Checklists Enviados Hoje</div>'
+    +'<table><thead><tr><th>Hora</th><th>Operador</th><th>Checklist</th><th>Conclusão</th></tr></thead>'
     +'<tbody>'+checkTbody+'</tbody></table></div>'
+
+    // Pendentes
+    +'<div class="section"><div class="section-title">Checklists Pendentes</div>'
+    +'<table><thead><tr><th>Checklist</th><th>Setor</th><th>Limite</th><th>Status</th></tr></thead>'
+    +'<tbody>'+pendTbody+'</tbody></table></div>'
 
     // Perdas registradas
     +'<div class="section"><div class="section-title">Perdas Registradas no Dia</div>'
@@ -4835,7 +4873,7 @@ function exportarRelatorioSupervisor() {
 
     // Assinaturas
     +'<div class="assinatura">'
-    +'<div class="ass-box">Responsável pela Prevenção de Perdas</div>'
+    +'<div class="ass-box">Responsável — '+perfilLabel+'</div>'
     +'<div class="ass-box">Supervisor / Gerente</div>'
     +'</div>'
 
