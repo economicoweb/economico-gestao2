@@ -751,7 +751,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '124';
+    var _BUILD = '125';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -2376,7 +2376,7 @@ function renderNclItens() {
       +'<div style="font-size:13px;font-weight:500">'+item.t+'</div>'
       +(item.obs ? '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+item.obs+'</div>' : '')
       +(item.tipo && item.tipo!=='checkbox' ? '<div style="font-size:11px;color:var(--bl);margin-top:2px">'+({simNao:'✅ Sim/Não',nota:'⭐ Nota 1–5',texto:'📝 Texto',planilha:'📊 Planilha de Contagem'}[item.tipo]||'')+(item.tipo==='planilha'&&item.lojas?' ('+Object.keys(item.lojas).join(', ')+')':item.tipo==='planilha'&&item.produtos?' ('+item.produtos.length+' produtos)':'')+'</div>' : '')
-      +(item.foto && item.foto!=='none' ? '<div style="font-size:11px;color:var(--g);margin-top:2px">'+(item.foto==='antes_depois'?'📷📷 Foto antes e depois':'📷 Foto depois')+'</div>' : '')
+      +(item.foto && item.foto!=='none' ? '<div style="font-size:11px;color:var(--g);margin-top:2px">'+(item.foto==='antes_depois'?'📷📷 Foto antes e depois':'📷 Foto')+'</div>' : '')
       +(item.critico ? '<div style="font-size:11px;font-weight:700;color:var(--r);margin-top:2px">⚠️ Item Crítico — reprova a inspeção inteira</div>' : '')
       +'</div>'
       +'<button onclick="removeItemNCL('+i+')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:16px;line-height:1;flex-shrink:0">✕</button>'
