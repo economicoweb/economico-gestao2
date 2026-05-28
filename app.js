@@ -758,7 +758,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '131';
+    var _BUILD = '132';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -877,8 +877,7 @@ function setupRole() {
   show('nav-central', isAdmin && !isColetor);
   show('nav-relat', (isAdmin || isSup || r==='gerencia') && !isColetor);
   show('nav-users', isAdmin && !isColetor);
-  // Alertas visível para admin e gerência (não supervisor)
-  show('nav-alertas', (isAdmOrGer || isSup) && !isColetor);
+  show('nav-alertas', (isAdmin || isSup) && !isColetor);
   show('nav-plano', (isAdmOrGer || isSup) && !isColetor);
   show('nav-checklist', !isColetor);
   show('nav-sec-checklist', !isColetor);
