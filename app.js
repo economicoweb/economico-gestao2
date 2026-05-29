@@ -761,7 +761,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '142';
+    var _BUILD = '143';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -8567,7 +8567,7 @@ function _mostrarSetorPicker(invId, endereco) {
       '<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;box-shadow:0 -4px 32px rgba(0,0,0,.18)">'+
         '<div style="font-family:\'Syne\',sans-serif;font-size:17px;font-weight:800;margin-bottom:4px">Selecionar Setor</div>'+
         '<div style="font-size:13px;color:var(--t3);margin-bottom:20px">Endereço: <strong style="font-family:monospace">'+endereco+'</strong></div>'+
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:14px" id="setor-picker-btns"></div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-bottom:14px" id="setor-picker-btns"></div>'+
         '<button onclick="_fecharSetorPicker()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;color:var(--t2)">Cancelar</button>'+
       '</div>'+
     '</div>';
@@ -8583,7 +8583,7 @@ function _mostrarSetorPicker(invId, endereco) {
       var c=(_setorColors[i%_setorColors.length]).split('|');
       var icon=_setorIcons[s]||'📁';
       var ss=s.replace(/'/g,"\\'");
-      return '<button onclick="_confirmarSetorFila(\''+safeInvId+'\',\''+safeEnd+'\',\''+ss+'\')" style="padding:18px 10px;border:2.5px solid '+c[0]+';border-radius:14px;background:'+c[1]+';color:'+c[2]+';font-size:15px;font-weight:800;font-family:\'Syne\',sans-serif;cursor:pointer">'+icon+'<br>'+s+'</button>';
+      return '<button onclick="_confirmarSetorFila(\''+safeInvId+'\',\''+safeEnd+'\',\''+ss+'\')" style="padding:14px 6px;border:2.5px solid '+c[0]+';border-radius:12px;background:'+c[1]+';color:'+c[2]+';font-size:13px;font-weight:800;font-family:\'Syne\',sans-serif;cursor:pointer;width:100%;box-sizing:border-box;word-break:break-word;line-height:1.3">'+icon+'<br>'+s+'</button>';
     }).join('');
   }
 }
