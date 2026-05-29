@@ -758,7 +758,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '134';
+    var _BUILD = '135';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -8589,9 +8589,15 @@ function _confirmarSetorFila(invId, found, setor) {
 }
 
 function liberarEnderecoFila(invId, endereco) {
-  db.collection('inv_inventarios').doc(invId).update(
-    new firebase.firestore.FieldPath('fila',endereco), firebase.firestore.FieldValue.delete()
-  ).catch(function(){});
+  var inv = (S.invsCache||[]).find(function(i){ return i.id===invId; });
+  var slot = inv && inv.fila && inv.fila[endereco];
+  // Só remove o slot da fila se o endereço ainda estiver em andamento.
+  // Se já estiver concluído, mantém o registro para o painel de gestão.
+  if (!slot || !slot.concluido) {
+    db.collection('inv_inventarios').doc(invId).update(
+      new firebase.firestore.FieldPath('fila',endereco), firebase.firestore.FieldValue.delete()
+    ).catch(function(){});
+  }
   _filaEndAtual=null;
 }
 
