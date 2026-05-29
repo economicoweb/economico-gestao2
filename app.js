@@ -761,7 +761,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '139';
+    var _BUILD = '140';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -6750,6 +6750,8 @@ function renderInvList() {
 function abrirDetalheInv(invId, tabInicial) {
   _invAtivo = (S.invsCache||[]).find(function(i){ return i.id===invId; }) || null;
   if (!_invAtivo) return;
+  // Salva imediatamente para restaurar em F5 (switchInvTab atualiza a aba)
+  localStorage.setItem('inv_detalhe_state', JSON.stringify({invId:invId, tab:tabInicial||'enderecos'}));
   document.getElementById('inv-lista-wrap').style.display = 'none';
   document.getElementById('inv-detalhe-wrap').style.display = 'block';
   document.getElementById('inv-detalhe-nome').textContent = _invAtivo.nome;
@@ -10139,6 +10141,21 @@ function _confirmarSemEAN(){
   });
 }
 
+
+// Garante que inv_detalhe_state está salvo antes do F5/fechamento
+window.addEventListener('beforeunload', function() {
+  if (typeof _invAtivo !== 'undefined' && _invAtivo && _invAtivo.id) {
+    var _tab = 'enderecos';
+    var _activeTab = document.querySelector('#inv-detalhe-tabs .tab.on');
+    if (_activeTab) {
+      var _oc = _activeTab.getAttribute('onclick') || '';
+      var _m = _oc.match(/switchInvTab\('([^']+)'/);
+      if (_m) _tab = _m[1];
+    }
+    localStorage.setItem('inv_detalhe_state', JSON.stringify({invId:_invAtivo.id, tab:_tab}));
+    localStorage.setItem('eco_last_page', 'inv');
+  }
+});
 
 // Restaura sessao ao recarregar a pagina
 // (script e defer — DOM ja esta pronto aqui, sem precisar de DOMContentLoaded)
