@@ -761,7 +761,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '145';
+    var _BUILD = '146';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -10170,32 +10170,4 @@ window.addEventListener('beforeunload', function() {
       }
     }
   } catch(e) {}
-})();
-
-// ── São João + Copa — Junho 2026 ──
-(function(){
-  var d=new Date();
-  if(d.getFullYear()!==2026||(d.getMonth()!==5&&!(d.getMonth()===4&&d.getDate()>=29))) return;
-  var BW=15,BH=22,CL=['#e8281e','#FFC600','#009b3a','#002776','#9b59b6','#e67e22','#e8281e','#fff'];
-  var n=Math.ceil((window.innerWidth||400)/(BW*2))+4,bands='';
-  for(var i=0;i<n;i++){var c=CL[i%CL.length];bands+='<div style="width:0;height:0;border-left:'+BW+'px solid transparent;border-right:'+BW+'px solid transparent;border-top:'+BH+'px solid '+c+';flex-shrink:0"></div>';}
-  var H=50;
-  var bar=document.createElement('div');
-  bar.id='fc-festa-bar';
-  bar.style.cssText='position:fixed;top:0;left:0;right:0;height:'+H+'px;z-index:200;background:#0d0d0d;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.5)';
-  bar.innerHTML=
-    '<div style="height:3px;flex-shrink:0;background:repeating-linear-gradient(90deg,#8B5E00 0px,#FFC600 6px,#8B5E00 12px)"></div>'
-    +'<div style="display:flex;align-items:flex-start;flex-shrink:0;margin-left:-1px">'+bands+'</div>'
-    +'<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px">'
-    +'<span style="font-size:13px">🎪</span>'
-    +'<span style="font-size:11px;font-weight:700;letter-spacing:.3px;color:#fff;font-family:\'DM Sans\',sans-serif;white-space:nowrap"><b style="color:#FFC600">São João</b> &amp; <b style="color:#3dd68c">Copa 2026</b></span>'
-    +'<span style="font-size:11px;color:rgba(255,255,255,.5)">—</span>'
-    +'<span style="font-size:13px">⚽</span>'
-    +'<span style="font-size:13px">🇧🇷</span>'
-    +'<span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.75);font-family:\'DM Sans\',sans-serif;white-space:nowrap">Vai Brasil!</span>'
-    +'</div>';
-  document.body.insertBefore(bar,document.body.firstChild);
-  var css=document.createElement('style');
-  css.textContent='#app{margin-top:'+H+'px!important;height:calc(100vh - '+H+'px)!important}#offline-banner{top:'+H+'px!important}#loginScreen{top:'+H+'px!important;height:calc(100vh - '+H+'px)!important}@media(max-width:768px){#app{height:auto!important;min-height:calc(100vh - '+H+'px)!important}}';
-  document.head.appendChild(css);
 })();
