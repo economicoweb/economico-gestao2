@@ -761,7 +761,7 @@ function finalizarLogin(found) {
     var dEl = document.getElementById('cl-data-hoje');
     if (dEl) dEl.textContent = hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('app').style.opacity='1';
-    var _BUILD = '147';
+    var _BUILD = '148';
     if (localStorage.getItem('fc360_build') !== _BUILD || /[?&]t=\d/.test(window.location.search)) {
       localStorage.setItem('fc360_build', _BUILD);
       sessionStorage.removeItem('eco_last_page');
@@ -10256,11 +10256,15 @@ function enviarMensagemIA(textoFixo) {
     'Usuário: ' + nome + ' | Perfil: ' + perfil + ' | Loja: ' + loja + ' | Agora: ' + agora + '\n' +
     'Responda SEMPRE em português brasileiro. Seja objetivo, prático e amigável. Use emojis com moderação.';
 
-  var contents = _iaHist.slice(0, placeholderIdx).map(function(m) {
+  // Garante que contents começa com mensagem do usuário (requisito da API)
+  var allMsgs = _iaHist.slice(0, placeholderIdx);
+  var firstUserIdx = -1;
+  for (var i = 0; i < allMsgs.length; i++) { if (allMsgs[i].r === 'u') { firstUserIdx = i; break; } }
+  var contents = (firstUserIdx >= 0 ? allMsgs.slice(firstUserIdx) : allMsgs).map(function(m) {
     return {role: m.r === 'u' ? 'user' : 'model', parts: [{text: m.t}]};
   });
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + _GK, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + _GK, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -10271,12 +10275,16 @@ function enviarMensagemIA(textoFixo) {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     var resp = 'Não consegui gerar uma resposta. Tente novamente.';
-    try { resp = data.candidates[0].content.parts[0].text; } catch(e) {}
+    try {
+      if (data.error) resp = '⚠️ Erro da API: ' + data.error.message;
+      else resp = data.candidates[0].content.parts[0].text;
+    } catch(e) { console.error('Gemini response:', JSON.stringify(data)); }
     _iaHist[placeholderIdx] = {r: 'bot', t: resp};
     _iaLoading = false;
     _iaRender();
   })
-  .catch(function() {
+  .catch(function(e) {
+    console.error('Gemini fetch error:', e);
     _iaHist[placeholderIdx] = {r: 'bot', t: '⚠️ Erro de conexão. Verifique a internet e tente novamente.'};
     _iaLoading = false;
     _iaRender();
